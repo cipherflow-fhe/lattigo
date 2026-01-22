@@ -3,7 +3,7 @@ package ring
 import (
 	"encoding/binary"
 
-	"github.com/tuneinsight/lattigo/v3/utils"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 // UniformSampler wraps a util.PRNG and represents the state of a sampler of uniform polynomials.

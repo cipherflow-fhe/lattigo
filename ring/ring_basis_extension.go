@@ -74,7 +74,7 @@ type ModupParams struct {
 	// Parameters for basis extension from Q to P
 	// (Q/Qi)^-1) (mod each Qi) (in Montgomery form)
 	qoverqiinvqi []uint64
-	// Q/qi (mod each Pj) (in Montgomery form)
+	// Q/qi (mod each Pj) (in Montgomery form if T is not power of 2)
 	qoverqimodp [][]uint64
 	// Q*v (mod each Pj) for v in [1,...,k] where k is the number of Pj moduli
 	vtimesqmodp [][]uint64
@@ -87,6 +87,8 @@ func GenModUpParams(Q, P []uint64) ModupParams {
 	mredParamsQ := make([]uint64, len(Q))
 	bredParamsP := make([][]uint64, len(P))
 	mredParamsP := make([]uint64, len(P))
+	pPowOf2 := make([]bool, len(P))
+	pMask := make([]uint64, len(P))
 
 	for i := range Q {
 		bredParamsQ[i] = BRedParams(Q[i])
@@ -94,8 +96,13 @@ func GenModUpParams(Q, P []uint64) ModupParams {
 	}
 
 	for i := range P {
-		bredParamsP[i] = BRedParams(P[i])
-		mredParamsP[i] = MRedParams(P[i])
+		pPowOf2[i] = (P[i]&(P[i]-1) == 0)
+		if !pPowOf2[i] {
+			bredParamsP[i] = BRedParams(P[i])
+			mredParamsP[i] = MRedParams(P[i])
+		} else {
+			pMask[i] = P[i] - 1
+		}
 	}
 
 	qoverqiinvqi := make([]uint64, len(Q))
@@ -120,15 +127,25 @@ func GenModUpParams(Q, P []uint64) ModupParams {
 		qoverqiinvqi[i] = ModexpMontgomery(qiStar, int(qi-2), qi, mredParamsQ[i], bredParamsQ[i])
 
 		for j, pj := range P {
-			// (Q/qi * r) (mod Pj) (in Montgomery form)
-			qiStar = 1
-			for u := 0; u < len(Q); u++ {
-				if u != i {
-					qiStar = MRed(qiStar, MForm(Q[u], pj, bredParamsP[j]), pj, mredParamsP[j])
+			if !pPowOf2[j] {
+				// (Q/qi * r) (mod Pj) (in Montgomery form)
+				qiStar = 1
+				for u := 0; u < len(Q); u++ {
+					if u != i {
+						qiStar = MRed(qiStar, MForm(Q[u], pj, bredParamsP[j]), pj, mredParamsP[j])
+					}
 				}
-			}
 
-			qoverqimodp[j][i] = MForm(qiStar, pj, bredParamsP[j])
+				qoverqimodp[j][i] = MForm(qiStar, pj, bredParamsP[j])
+			} else {
+				qiStar = 1
+				for u := 0; u < len(Q); u++ {
+					if u != i {
+						qiStar = (qiStar * Q[u]) & pMask[j]
+					}
+				}
+				qoverqimodp[j][i] = qiStar
+			}
 		}
 	}
 
@@ -138,15 +155,27 @@ func GenModUpParams(Q, P []uint64) ModupParams {
 		vtimesqmodp[j] = make([]uint64, len(Q)+1)
 		// Correction Term (v*Q) mod each Pj
 
-		QmodPi = 1
-		for _, qi := range Q {
-			QmodPi = MRed(QmodPi, MForm(qi, pj, bredParamsP[j]), pj, mredParamsP[j])
-		}
+		if !pPowOf2[j] {
+			QmodPi = 1
+			for _, qi := range Q {
+				QmodPi = MRed(QmodPi, MForm(qi, pj, bredParamsP[j]), pj, mredParamsP[j])
+			}
 
-		v := pj - QmodPi
-		vtimesqmodp[j][0] = 0
-		for i := 1; i < len(Q)+1; i++ {
-			vtimesqmodp[j][i] = CRed(vtimesqmodp[j][i-1]+v, pj)
+			v := pj - QmodPi
+			vtimesqmodp[j][0] = 0
+			for i := 1; i < len(Q)+1; i++ {
+				vtimesqmodp[j][i] = CRed(vtimesqmodp[j][i-1]+v, pj)
+			}
+		} else {
+			QmodPi = 1
+			for _, qi := range Q {
+				QmodPi = (QmodPi * qi) & pMask[j]
+			}
+			v := pj - QmodPi
+			vtimesqmodp[j][0] = 0
+			for i := 1; i < len(Q)+1; i++ {
+				vtimesqmodp[j][i] = (vtimesqmodp[j][i-1] + v) & pMask[j]
+			}
 		}
 	}
 
@@ -283,6 +312,34 @@ func ModUpExact(p1, p2 [][]uint64, ringQ, ringP *Ring, params ModupParams) {
 		reconstructRNS(len(p1), x, p1, &v, &y0, &y1, &y2, &y3, &y4, &y5, &y6, &y7, Q, mredParamsQ, qoverqiinvqi)
 		for j := 0; j < len(p2); j++ {
 			multSum((*[8]uint64)(unsafe.Pointer(&p2[j][x])), &v, &y0, &y1, &y2, &y3, &y4, &y5, &y6, &y7, len(p1), P[j], mredParamsP[j], vtimesqmodp[j], qoverqimodp[j])
+		}
+	}
+}
+
+func ModUpExactPowOf2(p1, p2 [][]uint64, ringQ, ringP *Ring, params ModupParams) {
+
+	var v [8]uint64
+	var y0, y1, y2, y3, y4, y5, y6, y7 [32]uint64
+
+	Q := ringQ.Modulus
+	P := ringP.Modulus
+	mredParamsQ := ringQ.MredParams
+	mredParamsP := ringP.MredParams
+	vtimesqmodp := params.vtimesqmodp
+	qoverqiinvqi := params.qoverqiinvqi
+	qoverqimodp := params.qoverqimodp
+	pPowOf2 := make([]bool, len(P))
+	pMask := make([]uint64, len(P))
+	for i := range P {
+		pPowOf2[i] = (P[i]&(P[i]-1) == 0)
+		pMask[i] = P[i] - 1
+	}
+
+	// We loop over each coefficient and apply the basis extension
+	for x := 0; x < len(p1[0]); x = x + 8 {
+		reconstructRNS(len(p1), x, p1, &v, &y0, &y1, &y2, &y3, &y4, &y5, &y6, &y7, Q, mredParamsQ, qoverqiinvqi)
+		for j := 0; j < len(p2); j++ {
+			multSumPowOf2((*[8]uint64)(unsafe.Pointer(&p2[j][x])), &v, &y0, &y1, &y2, &y3, &y4, &y5, &y6, &y7, len(p1), pMask[j], mredParamsP[j], vtimesqmodp[j], qoverqimodp[j])
 		}
 	}
 }
@@ -509,14 +566,22 @@ func reconstructRNS(index, x int, p [][]uint64, v *[8]uint64, y0, y1, y2, y3, y4
 		vi[7] += float64(y7[i]) / qif
 	}
 
-	v[0] = uint64(vi[0])
-	v[1] = uint64(vi[1])
-	v[2] = uint64(vi[2])
-	v[3] = uint64(vi[3])
-	v[4] = uint64(vi[4])
-	v[5] = uint64(vi[5])
-	v[6] = uint64(vi[6])
-	v[7] = uint64(vi[7])
+	// v[0] = uint64(vi[0])
+	// v[1] = uint64(vi[1])
+	// v[2] = uint64(vi[2])
+	// v[3] = uint64(vi[3])
+	// v[4] = uint64(vi[4])
+	// v[5] = uint64(vi[5])
+	// v[6] = uint64(vi[6])
+	// v[7] = uint64(vi[7])
+	v[0] = uint64(math.Round(vi[0])) // FPGA
+	v[1] = uint64(math.Round(vi[1]))
+	v[2] = uint64(math.Round(vi[2]))
+	v[3] = uint64(math.Round(vi[3]))
+	v[4] = uint64(math.Round(vi[4]))
+	v[5] = uint64(math.Round(vi[5]))
+	v[6] = uint64(math.Round(vi[6]))
+	v[7] = uint64(math.Round(vi[7]))
 }
 
 // Caution, returns the values in [0, 2q-1]
@@ -584,4 +649,28 @@ func multSum(res, v *[8]uint64, y0, y1, y2, y3, y4, y5, y6, y7 *[32]uint64, nbPi
 
 	hhi, _ = bits.Mul64(rlo[7]*qInv, pj)
 	res[7] = rhi[7] - hhi + pj + vtimesqmodp[v[7]]
+}
+
+func multSumPowOf2(res, v *[8]uint64, y0, y1, y2, y3, y4, y5, y6, y7 *[32]uint64, nbPi int, pMask, qInv uint64, vtimesqmodp, qoverqimodp []uint64) {
+	var rlo [8]uint64
+
+	for i := 0; i < nbPi; i++ {
+		rlo[0] = (rlo[0] + y0[i]*qoverqimodp[i]) & pMask
+		rlo[1] = (rlo[1] + y1[i]*qoverqimodp[i]) & pMask
+		rlo[2] = (rlo[2] + y2[i]*qoverqimodp[i]) & pMask
+		rlo[3] = (rlo[3] + y3[i]*qoverqimodp[i]) & pMask
+		rlo[4] = (rlo[4] + y4[i]*qoverqimodp[i]) & pMask
+		rlo[5] = (rlo[5] + y5[i]*qoverqimodp[i]) & pMask
+		rlo[6] = (rlo[6] + y6[i]*qoverqimodp[i]) & pMask
+		rlo[7] = (rlo[7] + y7[i]*qoverqimodp[i]) & pMask
+	}
+
+	res[0] = (rlo[0] + vtimesqmodp[v[0]]) & pMask
+	res[1] = (rlo[1] + vtimesqmodp[v[1]]) & pMask
+	res[2] = (rlo[2] + vtimesqmodp[v[2]]) & pMask
+	res[3] = (rlo[3] + vtimesqmodp[v[3]]) & pMask
+	res[4] = (rlo[4] + vtimesqmodp[v[4]]) & pMask
+	res[5] = (rlo[5] + vtimesqmodp[v[5]]) & pMask
+	res[6] = (rlo[6] + vtimesqmodp[v[6]]) & pMask
+	res[7] = (rlo[7] + vtimesqmodp[v[7]]) & pMask
 }

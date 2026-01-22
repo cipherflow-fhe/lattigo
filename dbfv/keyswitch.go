@@ -1,8 +1,8 @@
 package dbfv
 
 import (
-	"github.com/tuneinsight/lattigo/v3/bfv"
-	"github.com/tuneinsight/lattigo/v3/drlwe"
+	"github.com/cipherflow-fhe/lattigo/bfv"
+	"github.com/cipherflow-fhe/lattigo/drlwe"
 )
 
 // CKSProtocol is a structure storing the parameters for the collective key-switching protocol.

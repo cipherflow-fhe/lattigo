@@ -6,9 +6,9 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/rlwe"
 	"github.com/stretchr/testify/assert"
-	"github.com/tuneinsight/lattigo/v3/ring"
-	"github.com/tuneinsight/lattigo/v3/rlwe"
 )
 
 func testString(params rlwe.Parameters, opname string) string {

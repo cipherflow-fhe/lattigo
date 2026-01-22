@@ -5,7 +5,7 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/tuneinsight/lattigo/v3/ring"
+	"github.com/cipherflow-fhe/lattigo/ring"
 )
 
 // DecryptAndPrintError decrypts a ciphertext and prints the log2 of the error.

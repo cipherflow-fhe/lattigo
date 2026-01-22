@@ -5,9 +5,10 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/tuneinsight/lattigo/v3/ring"
-	"github.com/tuneinsight/lattigo/v3/rlwe"
-	"github.com/tuneinsight/lattigo/v3/utils"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/rlwe"
+	"github.com/cipherflow-fhe/lattigo/rlwe/ringqp"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 // Operand is a common interface for Ciphertext and Plaintext.
@@ -48,11 +49,16 @@ type Evaluator interface {
 	SwitchKeysNew(ctIn *Ciphertext, switchkey *rlwe.SwitchingKey) (ctOut *Ciphertext)
 	RotateColumnsNew(ctIn *Ciphertext, k int) (ctOut *Ciphertext)
 	RotateColumns(ctIn *Ciphertext, k int, ctOut *Ciphertext)
+	RotateHoistedNew(ctIn *Ciphertext, rotations []int) (ctOut map[int]*Ciphertext)
+	RotateHoisted(ctIn *Ciphertext, rotations []int, ctOut map[int]*Ciphertext)
 	RotateRows(ctIn *Ciphertext, ctOut *Ciphertext)
 	RotateRowsNew(ctIn *Ciphertext) (ctOut *Ciphertext)
 	InnerSum(ctIn *Ciphertext, ctOut *Ciphertext)
 	ShallowCopy() Evaluator
 	WithKey(rlwe.EvaluationKey) Evaluator
+
+	DecomposeNTTNew(levelQ, levelP, nbPi int, c2 *ring.Poly) (BuffDecompQP []ringqp.Poly)
+	AutomorphismHoistedNew(level int, ctIn *Ciphertext, c1DecompQP []ringqp.Poly, galEl uint64) (ctOut *Ciphertext)
 
 	BuffQ() [][]*ring.Poly
 	BuffQMul() [][]*ring.Poly
@@ -306,7 +312,7 @@ func (eval *evaluator) Rescale(ctIn, ctOut *Ciphertext) {
 // RescaleTo divides the ciphertext by the last moduli until it has `level+1` moduli left.
 func (eval *evaluator) RescaleTo(level int, ctIn, ctOut *Ciphertext) {
 
-	if ctIn.Level() < level || ctOut.Level() < ctIn.Level()-level {
+	if ctIn.Level() < level || ctOut.Level() < level {
 		panic("cannot RescaleTo: (ctIn.Level() || ctOut.Level()) < level")
 	}
 
@@ -492,9 +498,9 @@ func (eval *evaluator) quantizeLvl(level, levelQMul int, ctOut *rlwe.Ciphertext)
 		eval.basisExtenderQ1toQ2.ModDownQPtoP(level, levelQMul, c2Q1[i], c2Q2[i], c2Q2[i]) // QP / Q -> P
 
 		// Centers ct(x)P by (P-1)/2 and extends ct(x)P to the basis Q
-		eval.ringQMul.AddScalarBigintLvl(levelQMul, c2Q2[i], eval.pHalf[levelQMul], c2Q2[i])
+		// eval.ringQMul.AddScalarBigintLvl(levelQMul, c2Q2[i], eval.pHalf[levelQMul], c2Q2[i]) // FPGA
 		eval.basisExtenderQ1toQ2.ModUpPtoQ(levelQMul, level, c2Q2[i], ctOut.Value[i])
-		eval.ringQ.SubScalarBigintLvl(level, ctOut.Value[i], eval.pHalf[levelQMul], ctOut.Value[i])
+		// eval.ringQ.SubScalarBigintLvl(level, ctOut.Value[i], eval.pHalf[levelQMul], ctOut.Value[i]) // FPGA
 
 		// (ct(x)/Q)*T, doing so only requires that Q*P > Q*Q, faster but adds error ~|T|
 		eval.ringQ.MulScalarLvl(level, ctOut.Value[i], eval.t, ctOut.Value[i])
@@ -639,6 +645,46 @@ func (eval *evaluator) RotateColumns(ct0 *Ciphertext, k int, ctOut *Ciphertext) 
 func (eval *evaluator) RotateColumnsNew(ctIn *Ciphertext, k int) (ctOut *Ciphertext) {
 	ctOut = NewCiphertextLvl(eval.params, 1, ctIn.Level())
 	eval.RotateColumns(ctIn, k, ctOut)
+	return
+}
+
+// RotateHoistedNew takes an input Ciphertext and a list of rotations and returns a map of Ciphertext, where each element of the map is the input Ciphertext
+// rotation by one element of the list. It is much faster than sequential calls to Rotate.
+func (eval *evaluator) RotateHoistedNew(ctIn *Ciphertext, rotations []int) (ctOut map[int]*Ciphertext) {
+	ctOut = make(map[int]*Ciphertext)
+	for _, i := range rotations {
+		ctOut[i] = NewCiphertextLvl(eval.params, 1, ctIn.Level())
+	}
+	eval.RotateHoisted(ctIn, rotations, ctOut)
+	return
+}
+
+// RotateHoisted takes an input Ciphertext and a list of rotations and populates a map of pre-allocated Ciphertexts,
+// where each element of the map is the input Ciphertext rotation by one element of the list.
+// It is much faster than sequential calls to Rotate.
+func (eval *evaluator) RotateHoisted(ctIn *Ciphertext, rotations []int, ctOut map[int]*Ciphertext) {
+	levelQ := ctIn.Level()
+	eval.DecomposeNTT(levelQ, eval.params.PCount()-1, eval.params.PCount(), ctIn.Value[1], eval.BuffDecompQP)
+	for _, i := range rotations {
+		eval.AutomorphismHoisted(levelQ, ctIn.Ciphertext, eval.BuffDecompQP, eval.params.GaloisElementForColumnRotationBy(i), ctOut[i].Ciphertext)
+	}
+}
+
+func (eval *evaluator) DecomposeNTTNew(levelQ, levelP, nbPi int, c2 *ring.Poly) (BuffDecompQP []ringqp.Poly) {
+	decompRNS := eval.params.DecompRNS(eval.params.QCount()-1, eval.params.PCount()-1)
+	BuffDecompQP = make([]ringqp.Poly, decompRNS)
+	ringQP := eval.params.RingQP()
+	for i := 0; i < decompRNS; i++ {
+		BuffDecompQP[i] = ringQP.NewPoly()
+	}
+
+	eval.DecomposeNTT(levelQ, levelP, nbPi, c2, BuffDecompQP)
+	return
+}
+
+func (eval *evaluator) AutomorphismHoistedNew(level int, ctIn *Ciphertext, c1DecompQP []ringqp.Poly, galEl uint64) (ctOut *Ciphertext) {
+	ctOut = NewCiphertextLvl(eval.params, 1, ctIn.Level())
+	eval.AutomorphismHoisted(level, ctIn.Ciphertext, c1DecompQP, galEl, ctOut.Ciphertext)
 	return
 }
 

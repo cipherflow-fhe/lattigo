@@ -2,8 +2,8 @@
 package ringqp
 
 import (
-	"github.com/tuneinsight/lattigo/v3/ring"
-	"github.com/tuneinsight/lattigo/v3/utils"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 // Poly represents a polynomial in the ring of polynomial modulo Q*P.
@@ -388,6 +388,20 @@ func (p *Poly) GetDataLen64(WithMetadata bool) (dataLen int) {
 	return
 }
 
+func (p *Poly) GetDataLen32(WithMetadata bool) (dataLen int) {
+	if WithMetadata {
+		dataLen = 2
+	}
+	if p.Q != nil {
+		dataLen += p.Q.GetDataLen32(WithMetadata)
+	}
+	if p.P != nil {
+		dataLen += p.P.GetDataLen32(WithMetadata)
+	}
+
+	return
+}
+
 // WriteTo64 writes a Poly on the inpute data.
 // Encodes each coefficient on 8 bytes.
 func (p *Poly) WriteTo64(data []byte) (pt int, err error) {
@@ -412,6 +426,36 @@ func (p *Poly) WriteTo64(data []byte) (pt int, err error) {
 
 	if data[1] == 1 {
 		if inc, err = p.P.WriteTo64(data[pt:]); err != nil {
+			return
+		}
+		pt += inc
+	}
+
+	return
+}
+
+func (p *Poly) WriteTo32(data []byte) (pt int, err error) {
+	var inc int
+
+	if p.Q != nil {
+		data[0] = 1
+	}
+
+	if p.P != nil {
+		data[1] = 1
+	}
+
+	pt = 2
+
+	if data[0] == 1 {
+		if inc, err = p.Q.WriteTo32(data[pt:]); err != nil {
+			return
+		}
+		pt += inc
+	}
+
+	if data[1] == 1 {
+		if inc, err = p.P.WriteTo32(data[pt:]); err != nil {
 			return
 		}
 		pt += inc
@@ -447,6 +491,38 @@ func (p *Poly) DecodePoly64(data []byte) (pt int, err error) {
 		}
 
 		if inc, err = p.P.DecodePoly64(data[pt:]); err != nil {
+			return
+		}
+		pt += inc
+	}
+
+	return
+}
+
+func (p *Poly) DecodePoly32(data []byte) (pt int, err error) {
+
+	var inc int
+	pt = 2
+
+	if data[0] == 1 {
+
+		if p.Q == nil {
+			p.Q = new(ring.Poly)
+		}
+
+		if inc, err = p.Q.DecodePoly32(data[pt:]); err != nil {
+			return
+		}
+		pt += inc
+	}
+
+	if data[1] == 1 {
+
+		if p.P == nil {
+			p.P = new(ring.Poly)
+		}
+
+		if inc, err = p.P.DecodePoly32(data[pt:]); err != nil {
 			return
 		}
 		pt += inc

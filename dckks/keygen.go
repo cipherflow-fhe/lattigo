@@ -1,9 +1,9 @@
-//Package dckks implements a distributed (or threshold) version of the CKKS scheme that enables secure multiparty computation solutions with secret-shared secret keys.
+// Package dckks implements a distributed (or threshold) version of the CKKS scheme that enables secure multiparty computation solutions with secret-shared secret keys.
 package dckks
 
 import (
-	"github.com/tuneinsight/lattigo/v3/ckks"
-	"github.com/tuneinsight/lattigo/v3/drlwe"
+	"github.com/cipherflow-fhe/lattigo/ckks"
+	"github.com/cipherflow-fhe/lattigo/drlwe"
 )
 
 // CKGProtocol is the structure storing the parameters and state for a party in the collective key generation protocol.

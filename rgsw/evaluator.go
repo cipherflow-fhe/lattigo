@@ -1,9 +1,9 @@
 package rgsw
 
 import (
-	"github.com/tuneinsight/lattigo/v3/ring"
-	"github.com/tuneinsight/lattigo/v3/rlwe"
-	"github.com/tuneinsight/lattigo/v3/rlwe/ringqp"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/rlwe"
+	"github.com/cipherflow-fhe/lattigo/rlwe/ringqp"
 )
 
 // Evaluator is a type for evaluating homomorphic operations involving RGSW ciphertexts.
@@ -36,9 +36,13 @@ func (eval *Evaluator) WithKey(evaluationKey *rlwe.EvaluationKey) *Evaluator {
 
 // ExternalProduct computes RLWE x RGSW -> RLWE
 // RLWE : (-as + m + e, a)
-//  x
+//
+//	x
+//
 // RGSW : [(-as + P*w*m1 + e, a), (-bs + e, b + P*w*m1)]
-//  =
+//
+//	=
+//
 // RLWE : (<RLWE, RGSW[0]>, <RLWE, RGSW[1]>)
 func (eval *Evaluator) ExternalProduct(op0 *rlwe.Ciphertext, op1 *Ciphertext, op2 *rlwe.Ciphertext) {
 

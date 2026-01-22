@@ -3,10 +3,10 @@ package drlwe
 import (
 	"errors"
 
-	"github.com/tuneinsight/lattigo/v3/ring"
-	"github.com/tuneinsight/lattigo/v3/rlwe"
-	"github.com/tuneinsight/lattigo/v3/rlwe/ringqp"
-	"github.com/tuneinsight/lattigo/v3/utils"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/rlwe"
+	"github.com/cipherflow-fhe/lattigo/rlwe/ringqp"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 // RelinearizationKeyGenerator is an interface describing the local steps of a generic RLWE RKG protocol.

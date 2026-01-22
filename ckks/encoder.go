@@ -1,5 +1,5 @@
-//Package ckks implements a RNS-accelerated version of the Homomorphic Encryption for Arithmetic for Approximate Numbers
-//(HEAAN, a.k.a. CKKS) scheme. It provides approximate arithmetic over the complex numbers.package ckks
+// Package ckks implements a RNS-accelerated version of the Homomorphic Encryption for Arithmetic for Approximate Numbers
+// (HEAAN, a.k.a. CKKS) scheme. It provides approximate arithmetic over the complex numbers.package ckks
 package ckks
 
 import (
@@ -7,10 +7,11 @@ import (
 	"math"
 	"math/big"
 	"math/bits"
+	"sort"
 
-	"github.com/tuneinsight/lattigo/v3/ring"
-	"github.com/tuneinsight/lattigo/v3/rlwe/ringqp"
-	"github.com/tuneinsight/lattigo/v3/utils"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/rlwe/ringqp"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 // GaloisGen is an integer of order N/2 modulo M and that spans Z_M with the integer -1.
@@ -23,29 +24,33 @@ var pi = "3.14159265358979323846264338327950288419716939937510582097494459230781
 // into/from Plaintext types.
 // Two different encodings are provided:
 //
-//     - Coeffs: The coefficients are directly embedded on the plaintext. This encoding only allows to encode []float64 slices, but of size up to N
-//               (N being the ring degree) and does not preserve the point-wise multiplication. A ciphertext multiplication will result in a nega-
-//               cyclic polynomial convolution in the plaintext domain. This encoding does not provide native slot cyclic rotation.
-//               Other operations, like addition or constant multiplication, behave as usual.
+//   - Coeffs: The coefficients are directly embedded on the plaintext. This encoding only allows to encode []float64 slices, but of size up to N
+//     (N being the ring degree) and does not preserve the point-wise multiplication. A ciphertext multiplication will result in a nega-
+//     cyclic polynomial convolution in the plaintext domain. This encoding does not provide native slot cyclic rotation.
+//     Other operations, like addition or constant multiplication, behave as usual.
 //
-//     - Slots: The coefficients are first subjected to a special Fourier transform before being embedded in the plaintext by using Coeffs encoding.
-//              This encoding can embed []complex128 and []float64 slices of size at most N/2 (N being the ring degree) and leverages the convolution
-//              property of the DFT to preserve point-wise complex multiplication in the plaintext domain, i.e. a ciphertext multiplication will result
-//              in an element-wise multiplication in the plaintext domain. It also enables cyclic rotations on plaintext slots. Other operations, like
-//              constant multiplication, behave as usual. It is considered the default encoding method for CKKS.
-//
+//   - Slots: The coefficients are first subjected to a special Fourier transform before being embedded in the plaintext by using Coeffs encoding.
+//     This encoding can embed []complex128 and []float64 slices of size at most N/2 (N being the ring degree) and leverages the convolution
+//     property of the DFT to preserve point-wise complex multiplication in the plaintext domain, i.e. a ciphertext multiplication will result
+//     in an element-wise multiplication in the plaintext domain. It also enables cyclic rotations on plaintext slots. Other operations, like
+//     constant multiplication, behave as usual. It is considered the default encoding method for CKKS.
 //
 // The figure bellow illustrates the relationship between these two encodings:
 //
-//                                              Real^{N}          Z_Q[X]/(X^N+1)
+//	Real^{N}          Z_Q[X]/(X^N+1)
+//
 // EncodeCoeffs: ----------------------------->[]float64 ---------> Plaintext
-//                                                 |
-//                    Complex^{N/2}                |
+//
+//	                             |
+//	Complex^{N/2}                |
+//
 // EncodeSlots:  []complex128/[]float64 -> iDFT ---┘
 type Encoder interface {
 
 	// Slots Encoding
 	Encode(values interface{}, plaintext *Plaintext, logSlots int)
+	EncodeRingT(values interface{}, plaintext *PlaintextRingT, logSlots int)
+	EncodeCoeffsRingT(values interface{}, plaintext *PlaintextRingT, logSlots int)
 	EncodeNew(values interface{}, level int, scale float64, logSlots int) (plaintext *Plaintext)
 	EncodeSlots(values interface{}, plaintext *Plaintext, logSlots int)
 	EncodeSlotsNew(values interface{}, level int, scale float64, logSlots int) (plaintext *Plaintext)
@@ -60,8 +65,12 @@ type Encoder interface {
 	DecodeCoeffs(plaintext *Plaintext) (res []float64)
 	DecodeCoeffsPublic(plaintext *Plaintext, bound float64) (res []float64)
 
+	RingTToMul(ptRt *PlaintextRingT, ptmul *PlaintextMul)
+	RingTToPt(ptRt *PlaintextRingT, ptmul *Plaintext)
+
 	// Utility
 	Embed(values interface{}, logSlots int, scale float64, montgomery bool, polyOut interface{})
+	EmbedRingT(values interface{}, logSlots int, scale float64, montgomery bool, ifft bool, polyOut interface{})
 	GetErrSTDCoeffDomain(valuesWant, valuesHave []complex128, scale float64) (std float64)
 	GetErrSTDSlotDomain(valuesWant, valuesHave []complex128, scale float64) (std float64)
 	ShallowCopy() Encoder
@@ -162,6 +171,76 @@ func NewEncoder(params Parameters) Encoder {
 	}
 }
 
+func (ecd *encoderComplex128) RingTToMul(ptRt *PlaintextRingT, ptMul *PlaintextMul) {
+	level := ptMul.Level()
+
+	// Reuse RingTToPt logic - ptMul is compatible with Plaintext
+	tempPt := (*Plaintext)(ptMul)
+	ecd.RingTToPt(ptRt, tempPt)
+
+	// Add Montgomery form that RingTToPt doesn't do
+	ecd.params.RingQ().MFormLvl(level, ptMul.Value, ptMul.Value)
+}
+
+func (ecd *encoderComplex128) RingTToPt(ptRt *PlaintextRingT, pt *Plaintext) {
+	level := pt.Level()
+	bredParams := ecd.params.RingQ().BredParams
+	Q := ecd.params.RingQ().Modulus
+
+	serialize_data_bit_length_from_ckks_param := func(param Parameters) int {
+		primes := append(param.Q(), param.P()...)
+		sort.Slice(primes, func(i, j int) bool { return primes[i] < primes[j] })
+		return bits.Len64(primes[len(primes)-1])
+	}
+
+	if ecd.params.IsFpga {
+		data_bit_length := serialize_data_bit_length_from_ckks_param(ecd.params)
+		var is_negative_pos int
+		var mask uint64
+		if data_bit_length <= 32 {
+			is_negative_pos = 31
+			mask = 0x7fffffff
+		} else {
+			is_negative_pos = 63
+			mask = 0x7fffffffffffffff
+		}
+
+		for i := 0; i < level+1; i++ {
+			for j := 0; j < len(pt.Value.Coeffs[0]); j++ {
+				c := ptRt.Value.Coeffs[0][j]
+				IsNegative := (c >> uint64(is_negative_pos)) & 0x1
+				c = c & mask
+				c = uint64(float64(c) * (1 << (32 - 26)))
+
+				if IsNegative == 1 {
+					if c > Q[i] {
+						pt.Value.Coeffs[i][j] = Q[i] - ring.BRedAdd(c, Q[i], bredParams[i])
+					} else {
+						pt.Value.Coeffs[i][j] = Q[i] - c
+					}
+				} else {
+					if c > Q[i] {
+						pt.Value.Coeffs[i][j] = ring.BRedAdd(c, Q[i], bredParams[i])
+					} else {
+						pt.Value.Coeffs[i][j] = c
+					}
+				}
+			}
+		}
+	} else {
+		ringQ0, err := ring.NewRing(ecd.params.N(), ecd.params.RingQ().Modulus[:1])
+		if err != nil {
+			panic(err.Error())
+		}
+		basisExtender := ring.NewBasisExtender(ringQ0, ecd.params.RingQ())
+		basisExtender.ModUpQtoP(0, level, ptRt.Value, pt.Value)
+
+	}
+
+	NttAndMontgomeryLvl(pt.Level(), ecd.params.logSlots, ecd.params.RingQ(), false, pt.Value)
+	// Note: MFormLvl is removed compared to RingTToMul
+}
+
 // Encode encodes a set of values on the target plaintext.
 // This method is identical to "EncodeSlots".
 // Encoding is done at the level and scale of the plaintext.
@@ -171,6 +250,14 @@ func NewEncoder(params Parameters) Encoder {
 // Returned plaintext is always in the NTT domain.
 func (ecd *encoderComplex128) Encode(values interface{}, plaintext *Plaintext, logSlots int) {
 	ecd.Embed(values, logSlots, plaintext.Scale, false, plaintext.Value)
+}
+
+func (ecd *encoderComplex128) EncodeRingT(values interface{}, plaintext *PlaintextRingT, logSlots int) {
+	ecd.EmbedRingT(values, logSlots, plaintext.Scale, false, true, plaintext.Value)
+}
+
+func (ecd *encoderComplex128) EncodeCoeffsRingT(values interface{}, plaintext *PlaintextRingT, logSlots int) {
+	ecd.EmbedRingT(values, logSlots, plaintext.Scale, false, false, plaintext.Value)
 }
 
 // EncodeNew encodes a set of values on a new plaintext.
@@ -324,12 +411,16 @@ func (ecd *encoderComplex128) ShallowCopy() Encoder {
 // Embed is a generic method to encode a set of values on the target polyOut interface.
 // This method it as the core of the slot encoding.
 // values: values.(type) can be either []complex128 of []float64.
-//         The imaginary part of []complex128 will be discarded if ringType == ring.ConjugateInvariant.
+//
+//	The imaginary part of []complex128 will be discarded if ringType == ring.ConjugateInvariant.
+//
 // logslots: user must ensure that 1 <= len(values) <= 2^logSlots < 2^logN and that logSlots >= 3.
 // scale: the scaling factor used do discretize float64 to fixed point integers.
 // montgomery: if true then the value written on polyOut are put in the Montgomery domain.
 // polyOut: polyOut.(type) can be either ringqp.Poly or *ring.Poly.
-//          The encoding encoding is done at the level of polyOut.
+//
+//	The encoding encoding is done at the level of polyOut.
+//
 // Values written on  polyOut are always in the NTT domain.
 func (ecd *encoderComplex128) Embed(values interface{}, logSlots int, scale float64, montgomery bool, polyOut interface{}) {
 
@@ -408,6 +499,100 @@ func (ecd *encoderComplex128) Embed(values interface{}, logSlots int, scale floa
 	case *ring.Poly:
 		complexToFixedPointCRT(p.Level(), ecd.values[:slots], scale, ecd.params.RingQ(), p.Coeffs, isRingStandard)
 		NttAndMontgomeryLvl(p.Level(), logSlots, ecd.params.RingQ(), montgomery, p)
+	default:
+		panic("cannot Embed: invalid polyOut.(Type) must be ringqp.Poly or *ring.Poly")
+	}
+}
+
+func (ecd *encoderComplex128) EmbedRingT(values interface{}, logSlots int, scale float64, montgomery bool, ifft bool, polyOut interface{}) {
+
+	if logSlots < minLogSlots || logSlots > ecd.params.MaxLogSlots() {
+		panic(fmt.Sprintf("cannot Embed: logSlots (%d) must be greater or equal to %d and smaller than %d\n", logSlots, minLogSlots, ecd.params.MaxLogSlots()))
+	}
+
+	slots := 1 << logSlots
+	var lenValues int
+
+	// First checks the type of input values
+	switch values := values.(type) {
+
+	// If complex
+	case []complex128:
+		// Checks that the number of values is with the possible range
+		if len(values) > ecd.params.MaxSlots() || len(values) > slots {
+			panic(fmt.Sprintf("cannot Embed: ensure that #values (%d) <= slots (%d) <= maxSlots (%d)\n", len(values), slots, ecd.params.MaxSlots()))
+		}
+
+		lenValues = len(values)
+
+		switch ecd.params.RingType() {
+
+		case ring.Standard:
+			copy(ecd.values[:len(values)], values)
+
+		case ring.ConjugateInvariant:
+			// Discards the imaginary part
+			for i := range values {
+				ecd.values[i] = complex(real(values[i]), 0)
+			}
+
+		// Else panics
+		default:
+			panic("cannot Embed: ringType must be ring.Standard or ring.ConjugateInvariant")
+		}
+
+	// If floats only
+	case []float64:
+		if len(values) > ecd.params.MaxSlots() || len(values) > slots {
+			panic(fmt.Sprintf("cannot Embed: ensure that #values (%d) <= slots (%d) <= maxSlots (%d)\n", len(values), slots, ecd.params.MaxSlots()))
+		}
+
+		lenValues = len(values)
+
+		for i := range values {
+			ecd.values[i] = complex(values[i], 0)
+		}
+
+	default:
+		panic("cannot Embed: values.(Type) must be []complex128 or []float64")
+	}
+
+	for i := lenValues; i < slots; i++ {
+		ecd.values[i] = 0
+	}
+
+	if ifft {
+		if logSlots < 4 {
+			SpecialiFFTVec(ecd.values, slots, ecd.m, ecd.rotGroup, ecd.roots)
+		} else {
+			SpecialiFFTUL8Vec(ecd.values, slots, ecd.m, ecd.rotGroup, ecd.roots)
+		}
+	}
+
+	isRingStandard := ecd.params.RingType() == ring.Standard
+
+	serialize_data_bit_length_from_ckks_param := func(param Parameters) int {
+		primes := append(param.Q(), param.P()...)
+		sort.Slice(primes, func(i, j int) bool { return primes[i] < primes[j] })
+		return bits.Len64(primes[len(primes)-1])
+	}
+
+	data_bit_length := serialize_data_bit_length_from_ckks_param(ecd.params)
+
+	msg_scale := scale
+	if ecd.params.IsFpga {
+		msg_scale = scale / float64(1<<(32-26))
+	}
+
+	switch p := polyOut.(type) {
+	case ringqp.Poly:
+		complexToFixedPoint(ecd.values[:slots], msg_scale, data_bit_length, ecd.params.RingQ(), p.Q.Coeffs[0], isRingStandard, ecd.params.IsFpga)
+
+		if p.P != nil {
+			complexToFixedPoint(ecd.values[:slots], msg_scale, data_bit_length, ecd.params.RingP(), p.P.Coeffs[0], isRingStandard, ecd.params.IsFpga)
+		}
+	case *ring.Poly:
+		complexToFixedPoint(ecd.values[:slots], msg_scale, data_bit_length, ecd.params.RingQ(), p.Coeffs[0], isRingStandard, ecd.params.IsFpga)
 	default:
 		panic("cannot Embed: invalid polyOut.(Type) must be ringqp.Poly or *ring.Poly")
 	}

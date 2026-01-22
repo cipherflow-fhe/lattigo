@@ -5,10 +5,10 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/cipherflow-fhe/lattigo/ckks"
+	"github.com/cipherflow-fhe/lattigo/rlwe"
+	"github.com/cipherflow-fhe/lattigo/utils"
 	"github.com/stretchr/testify/assert"
-	"github.com/tuneinsight/lattigo/v3/ckks"
-	"github.com/tuneinsight/lattigo/v3/rlwe"
-	"github.com/tuneinsight/lattigo/v3/utils"
 )
 
 func TestHomomorphicMod(t *testing.T) {

@@ -10,10 +10,11 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/rlwe"
+	"github.com/cipherflow-fhe/lattigo/utils"
+
 	"github.com/stretchr/testify/require"
-	"github.com/tuneinsight/lattigo/v3/ring"
-	"github.com/tuneinsight/lattigo/v3/rlwe"
-	"github.com/tuneinsight/lattigo/v3/utils"
 )
 
 var nbParties = int(3)

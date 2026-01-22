@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 
-	"github.com/tuneinsight/lattigo/v3/ring"
+	"github.com/cipherflow-fhe/lattigo/ring"
 )
 
 // GetDataLen returns the length in bytes of the target Ciphertext.
@@ -75,10 +75,63 @@ func (el *Ciphertext) UnmarshalBinary(data []byte) (err error) {
 	return nil
 }
 
+func (el *CompressedCiphertext) GetDataLen(WithMetaData bool) (dataLen int) {
+	dataLen += 64
+	dataLen += el.Value.GetDataLen64(WithMetaData)
+
+	return dataLen
+}
+
+func (el *CompressedCiphertext) MarshalBinary() (data []byte, err error) {
+	data = make([]byte, el.GetDataLen(true))
+
+	var pointer, inc int
+	pointer = 0
+
+	for i := 0; i < 64; i++ {
+		data[pointer+i] = el.Seed[i]
+	}
+	pointer += 64
+
+	if inc, err = el.Value.WriteTo64(data[pointer:]); err != nil {
+		return nil, err
+	}
+	pointer += inc
+
+	return data, nil
+}
+
+func (el *CompressedCiphertext) UnmarshalBinary(data []byte) (err error) {
+	var pointer, inc int
+	pointer = 0
+
+	el.Seed = make([]byte, 64)
+	for i := 0; i < 64; i++ {
+		el.Seed[i] = data[pointer+i]
+	}
+	pointer += 64
+
+	el.Value = new(ring.Poly)
+	if inc, err = el.Value.DecodePoly64(data[pointer:]); err != nil {
+		return err
+	}
+	pointer += inc
+
+	if pointer != len(data) {
+		return errors.New("remaining unparsed data")
+	}
+
+	return nil
+}
+
 // GetDataLen64 returns the length in bytes of the target SecretKey.
 // Assumes that each coefficient uses 8 bytes.
 func (sk *SecretKey) GetDataLen64(WithMetadata bool) (dataLen int) {
 	return sk.Value.GetDataLen64(WithMetadata)
+}
+
+func (sk *SecretKey) GetDataLen32(WithMetadata bool) (dataLen int) {
+	return sk.Value.GetDataLen32(WithMetadata)
 }
 
 // MarshalBinary encodes a secret key in a byte slice.
@@ -90,15 +143,32 @@ func (sk *SecretKey) MarshalBinary() (data []byte, err error) {
 	return
 }
 
+func (sk *SecretKey) MarshalBinary32() (data []byte, err error) {
+	data = make([]byte, sk.GetDataLen32(true))
+	if _, err = sk.Value.WriteTo32(data); err != nil {
+		return nil, err
+	}
+	return
+}
+
 // UnmarshalBinary decodes a previously marshaled SecretKey in the target SecretKey.
 func (sk *SecretKey) UnmarshalBinary(data []byte) (err error) {
 	_, err = sk.Value.DecodePoly64(data)
 	return
 }
 
+func (sk *SecretKey) UnmarshalBinary32(data []byte) (err error) {
+	_, err = sk.Value.DecodePoly32(data)
+	return
+}
+
 // GetDataLen64 returns the length in bytes of the target PublicKey.
 func (pk *PublicKey) GetDataLen64(WithMetadata bool) (dataLen int) {
 	return pk.Value[0].GetDataLen64(WithMetadata) + pk.Value[1].GetDataLen64(WithMetadata)
+}
+
+func (pk *PublicKey) GetDataLen32(WithMetadata bool) (dataLen int) {
+	return pk.Value[0].GetDataLen32(WithMetadata) + pk.Value[1].GetDataLen32(WithMetadata)
 }
 
 // MarshalBinary encodes a PublicKey in a byte slice.
@@ -111,6 +181,21 @@ func (pk *PublicKey) MarshalBinary() (data []byte, err error) {
 	pt += inc
 
 	if _, err = pk.Value[1].WriteTo64(data[pt:]); err != nil {
+		return nil, err
+	}
+
+	return
+}
+
+func (pk *PublicKey) MarshalBinary32() (data []byte, err error) {
+	data = make([]byte, pk.GetDataLen32(true))
+	var inc, pt int
+	if inc, err = pk.Value[0].WriteTo32(data[pt:]); err != nil {
+		return nil, err
+	}
+	pt += inc
+
+	if _, err = pk.Value[1].WriteTo32(data[pt:]); err != nil {
 		return nil, err
 	}
 
@@ -133,14 +218,29 @@ func (pk *PublicKey) UnmarshalBinary(data []byte) (err error) {
 	return
 }
 
+func (pk *PublicKey) UnmarshalBinary32(data []byte) (err error) {
+
+	var pt, inc int
+	if inc, err = pk.Value[0].DecodePoly32(data[pt:]); err != nil {
+		return
+	}
+	pt += inc
+
+	if _, err = pk.Value[1].DecodePoly32(data[pt:]); err != nil {
+		return
+	}
+
+	return
+}
+
 // MarshalBinary encodes the target SwitchingKey on a slice of bytes.
 func (swk *SwitchingKey) MarshalBinary() (data []byte, err error) {
-	return swk.GadgetCiphertext.MarshalBinary()
+	return swk.MarshalBinary()
 }
 
 // UnmarshalBinary decodes a slice of bytes on the target SwitchingKey.
 func (swk *SwitchingKey) UnmarshalBinary(data []byte) (err error) {
-	return swk.GadgetCiphertext.UnmarshalBinary(data)
+	return swk.UnmarshalBinary(data)
 }
 
 // GetDataLen returns the length in bytes of the target EvaluationKey.
@@ -151,6 +251,15 @@ func (rlk *RelinearizationKey) GetDataLen(WithMetadata bool) (dataLen int) {
 	}
 
 	return dataLen + len(rlk.Keys)*rlk.Keys[0].GetDataLen(WithMetadata)
+}
+
+func (rlk *RelinearizationKey) GetDataLen32(WithMetadata bool) (dataLen int) {
+
+	if WithMetadata {
+		dataLen++
+	}
+
+	return dataLen + len(rlk.Keys)*rlk.Keys[0].GetDataLen32(WithMetadata)
 }
 
 // MarshalBinary encodes an EvaluationKey key in a byte slice.
@@ -169,6 +278,28 @@ func (rlk *RelinearizationKey) MarshalBinary() (data []byte, err error) {
 	for _, evakey := range rlk.Keys {
 
 		if pointer, err = evakey.Encode(pointer, data); err != nil {
+			return nil, err
+		}
+	}
+
+	return data, nil
+}
+
+func (rlk *RelinearizationKey) MarshalBinary32() (data []byte, err error) {
+
+	var pointer int
+
+	dataLen := rlk.GetDataLen32(true)
+
+	data = make([]byte, dataLen)
+
+	data[0] = uint8(len(rlk.Keys))
+
+	pointer++
+
+	for _, evakey := range rlk.Keys {
+
+		if pointer, err = evakey.Encode32(pointer, data); err != nil {
 			return nil, err
 		}
 	}
@@ -196,6 +327,25 @@ func (rlk *RelinearizationKey) UnmarshalBinary(data []byte) (err error) {
 	return nil
 }
 
+func (rlk *RelinearizationKey) UnmarshalBinary32(data []byte) (err error) {
+
+	deg := int(data[0])
+
+	rlk.Keys = make([]*SwitchingKey, deg)
+
+	pointer := 1
+	var inc int
+	for i := 0; i < deg; i++ {
+		rlk.Keys[i] = new(SwitchingKey)
+		if inc, err = rlk.Keys[i].Decode32(data[pointer:]); err != nil {
+			return err
+		}
+		pointer += inc
+	}
+
+	return nil
+}
+
 // GetDataLen returns the length in bytes of the target RotationKeys.
 func (rtks *RotationKeySet) GetDataLen(WithMetaData bool) (dataLen int) {
 	for _, k := range rtks.Keys {
@@ -203,6 +353,16 @@ func (rtks *RotationKeySet) GetDataLen(WithMetaData bool) (dataLen int) {
 			dataLen += 8
 		}
 		dataLen += k.GetDataLen(WithMetaData)
+	}
+	return
+}
+
+func (rtks *RotationKeySet) GetDataLen32(WithMetaData bool) (dataLen int) {
+	for _, k := range rtks.Keys {
+		if WithMetaData {
+			dataLen += 8
+		}
+		dataLen += k.GetDataLen32(WithMetaData)
 	}
 	return
 }
@@ -227,6 +387,25 @@ func (rtks *RotationKeySet) MarshalBinary() (data []byte, err error) {
 	return data, nil
 }
 
+func (rtks *RotationKeySet) MarshalBinary32() (data []byte, err error) {
+
+	data = make([]byte, rtks.GetDataLen32(true))
+
+	pointer := int(0)
+
+	for galEL, key := range rtks.Keys {
+
+		binary.BigEndian.PutUint64(data[pointer:pointer+8], galEL)
+		pointer += 8
+
+		if pointer, err = key.Encode32(pointer, data); err != nil {
+			return nil, err
+		}
+	}
+
+	return data, nil
+}
+
 // UnmarshalBinary decodes a previously marshaled RotationKeys in the target RotationKeys.
 func (rtks *RotationKeySet) UnmarshalBinary(data []byte) (err error) {
 
@@ -238,8 +417,32 @@ func (rtks *RotationKeySet) UnmarshalBinary(data []byte) (err error) {
 		data = data[8:]
 
 		swk := new(SwitchingKey)
+
 		var inc int
 		if inc, err = swk.Decode(data); err != nil {
+			return err
+		}
+		data = data[inc:]
+		rtks.Keys[galEl] = swk
+
+	}
+
+	return nil
+}
+
+func (rtks *RotationKeySet) UnmarshalBinary32(data []byte) (err error) {
+
+	rtks.Keys = make(map[uint64]*SwitchingKey)
+
+	for len(data) > 0 {
+
+		galEl := binary.BigEndian.Uint64(data)
+		data = data[8:]
+
+		swk := new(SwitchingKey)
+
+		var inc int
+		if inc, err = swk.Decode32(data); err != nil {
 			return err
 		}
 		data = data[inc:]

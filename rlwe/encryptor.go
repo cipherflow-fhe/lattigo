@@ -1,11 +1,12 @@
 package rlwe
 
 import (
+	"crypto/rand"
 	"fmt"
 
-	"github.com/tuneinsight/lattigo/v3/ring"
-	"github.com/tuneinsight/lattigo/v3/rlwe/ringqp"
-	"github.com/tuneinsight/lattigo/v3/utils"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/rlwe/ringqp"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 // Encryptor a generic RLWE encryption interface.
@@ -18,7 +19,7 @@ type Encryptor interface {
 }
 
 // PRNGEncryptor is an interface for encrypting RLWE ciphertexts from a secret-key and
-// an pre-determined PRNG. An Encryptor constructed from a secret-key complies to this
+// a pre-determined PRNG. An Encryptor constructed from a secret-key complies to this
 // interface.
 type PRNGEncryptor interface {
 	Encryptor
@@ -56,7 +57,7 @@ func NewEncryptor(params Parameters, key interface{}) Encryptor {
 	case *SecretKey, SecretKey:
 		return newSkEncryptor(params, key)
 	default:
-		panic("key must be either *rlwe.PublicKey or *rlwe.SecretKey")
+		panic("cannot NewEncryptor: key must be either *rlwe.PublicKey or *rlwe.SecretKey")
 	}
 }
 
@@ -91,7 +92,7 @@ func newSkEncryptor(params Parameters, key interface{}) (enc *skEncryptor) {
 
 	prng, err := utils.NewPRNG()
 	if err != nil {
-		panic(fmt.Errorf("could not create PRNG for symmetric encryptor: %s", err))
+		panic(fmt.Errorf("cannot newSkEncryptor: could not create PRNG for symmetric encryptor: %s", err))
 	}
 
 	enc = &skEncryptor{*newEncryptorBase(params), nil, ringqp.NewUniformSampler(prng, *params.RingQP())}
@@ -135,10 +136,10 @@ func newEncryptorBuffers(params Parameters) *encryptorBuffers {
 	}
 }
 
-// Encrypt encrypts the input plaintext using the stored public-key and writes the result in ct.
-// The encryption procedure first samples an new encryption of zero under the public-key and
+// Encrypt encrypts the input plaintext using the stored public-key and writes the result on ct.
+// The encryption procedure first samples a new encryption of zero under the public-key and
 // then adds the plaintext.
-// The encryption procedures depends on the parameters: If the auxiliary modulus P is defined, the
+// The encryption procedure depends on the parameters: If the auxiliary modulus P is defined, the
 // encryption of zero is sampled in QP before being rescaled by P; otherwise, it is directly sampled in Q.
 // The method accepts only *rlwe.Ciphertext as input.
 func (enc *pkEncryptor) Encrypt(pt *Plaintext, ct interface{}) {
@@ -153,13 +154,13 @@ func (enc *pkEncryptor) Encrypt(pt *Plaintext, ct interface{}) {
 				enc.encryptNoP(pt, el)
 			}
 		default:
-			panic("input ciphertext type unsupported (must be *rlwe.Ciphertext or *rgsw.Ciphertext)")
+			panic("cannot Encrypt: input ciphertext type unsupported (must be *rlwe.Ciphertext or *rgsw.Ciphertext)")
 		}
 	}
 }
 
-// EncryptZero generates an encryption of zero under the stored public-key and writes the result in ct.
-// The encryption procedures depends on the parameters: If the auxiliary modulus P is defined, the
+// EncryptZero generates an encryption of zero under the stored public-key and writes the result on ct.
+// The encryption procedure depends on the parameters: If the auxiliary modulus P is defined, the
 // encryption of zero is sampled in QP before being rescaled by P; otherwise, it is directly sampled in Q.
 // The method accepts only *rlwe.Ciphertext as input.
 func (enc *pkEncryptor) EncryptZero(ct interface{}) {
@@ -171,7 +172,7 @@ func (enc *pkEncryptor) EncryptZero(ct interface{}) {
 			enc.encryptZeroNoP(ct)
 		}
 	default:
-		panic("input ciphertext type unsupported")
+		panic("cannot EncryptZero: input ciphertext type unsupported")
 	}
 }
 
@@ -360,8 +361,15 @@ func (enc *skEncryptor) Encrypt(pt *Plaintext, ct interface{}) {
 		case *ring.Poly:
 			enc.uniformSampler.ReadLvl(utils.MinInt(pt.Level(), el.Level()), -1, ringqp.Poly{Q: enc.buffQ[1]})
 			enc.encryptRLWE(pt, el, enc.buffQ[1])
+		case *CompressedCiphertext:
+			rand.Read(el.Seed)
+			prng, _ := utils.NewKeyedPRNG(el.Seed)
+			uniform_sampler := ringqp.NewUniformSampler(prng, *enc.params.RingQP())
+			a := ring.NewPoly(pt.Value.N(), pt.Level())
+			uniform_sampler.ReadLvl(pt.Level(), -1, ringqp.Poly{Q: a})
+			enc.encryptRLWE(pt, el.Value, a)
 		default:
-			panic("input ciphertext type unsuported (must be *rlwe.Ciphertext or *rgsw.Ciphertext)")
+			panic("cannot Encrypt: input ciphertext type unsuported (must be *rlwe.Ciphertext or *rgsw.Ciphertext)")
 		}
 	}
 
@@ -380,7 +388,7 @@ func (enc *skEncryptor) EncryptZero(ct interface{}) {
 	case *CiphertextQP:
 		enc.encryptZeroQP(*el)
 	default:
-		panic("input ciphertext type unsupported")
+		panic("cannot EncryptZero: input ciphertext type unsupported")
 	}
 }
 
@@ -407,7 +415,7 @@ func (enc *skEncryptor) encryptZero(c0, c1 *ring.Poly) {
 // levelQ : level of the modulus Q
 // levelP : level of the modulus P
 // sk     : secret key
-// sampler: uniform sampler, if `sampler` is nil, then will sample using the internal sampler.
+// sampler: uniform sampler; if `sampler` is nil, then will sample using the internal sampler.
 // montgomery: returns the result in the Montgomery domain.
 func (enc *skEncryptor) encryptZeroQP(ct CiphertextQP) {
 
@@ -424,12 +432,15 @@ func (enc *skEncryptor) encryptZeroQP(ct CiphertextQP) {
 
 	ringQP.NTTLvl(levelQ, levelP, c0, c0)
 	// ct[1] is assumed to be sampled in of the Montgomery domain,
-	// thus -as will also be in the montgomery domain (s is by default), therefore 'e'
-	// must be switched to the montgomery domain.
+	// thus -as will also be in the Montgomery domain (s is by default), therefore 'e'
+	// must be switched to the Montgomery domain.
 	ringQP.MFormLvl(levelQ, levelP, c0, c0)
 
 	// ct = (e, a)
-	enc.uniformSampler.ReadLvl(levelQ, levelP, c1)
+	rand.Read(ct.Seed)
+	prng, _ := utils.NewKeyedPRNG(ct.Seed)
+	uniform_sampler := ringqp.NewUniformSampler(prng, *enc.params.RingQP())
+	uniform_sampler.ReadLvl(levelQ, levelP, c1)
 
 	// (-a*sk + e, a)
 	ringQP.MulCoeffsMontgomeryAndSubLvl(levelQ, levelP, c1, enc.sk.Value, c0)
@@ -499,7 +510,7 @@ func (enc *skEncryptor) ShallowCopy() Encryptor {
 	return NewEncryptor(enc.params, enc.sk)
 }
 
-// WithKey returns this encryptor with a new key .
+// WithKey returns this encryptor with a new key.
 func (enc *skEncryptor) WithKey(key interface{}) Encryptor {
 	skPtr, err := enc.checkSk(key)
 	if err != nil {
@@ -508,7 +519,7 @@ func (enc *skEncryptor) WithKey(key interface{}) Encryptor {
 	return &skEncryptor{enc.encryptorBase, skPtr, enc.uniformSampler}
 }
 
-// WithKey returns this encryptor with a new key .
+// WithKey returns this encryptor with a new key.
 func (enc *pkEncryptor) WithKey(key interface{}) Encryptor {
 	pkPtr, err := enc.checkPk(key)
 	if err != nil {
@@ -555,7 +566,7 @@ func (enc encryptorBase) checkSk(key interface{}) (sk *SecretKey, err error) {
 	}
 
 	if sk.Value.Q.N() != enc.params.N() {
-		panic("sk ring degree does not match params ring degree")
+		panic("cannot checkSk: sk ring degree does not match params ring degree")
 	}
 
 	return sk, nil

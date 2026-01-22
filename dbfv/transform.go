@@ -1,11 +1,11 @@
 package dbfv
 
 import (
-	"github.com/tuneinsight/lattigo/v3/bfv"
-	"github.com/tuneinsight/lattigo/v3/drlwe"
-	"github.com/tuneinsight/lattigo/v3/ring"
-	"github.com/tuneinsight/lattigo/v3/rlwe"
-	"github.com/tuneinsight/lattigo/v3/utils"
+	"github.com/cipherflow-fhe/lattigo/bfv"
+	"github.com/cipherflow-fhe/lattigo/drlwe"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/rlwe"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 // MaskedTransformProtocol is a struct storing the parameters for the MaskedTransformProtocol protocol.

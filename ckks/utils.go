@@ -4,7 +4,7 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/tuneinsight/lattigo/v3/ring"
+	"github.com/cipherflow-fhe/lattigo/ring"
 )
 
 // StandardDeviation computes the scaled standard deviation of the input vector.
@@ -117,6 +117,28 @@ func complexToFixedPointCRT(level int, values []complex128, scale float64, ringQ
 	}
 }
 
+func complexToFixedPoint(values []complex128, scale float64, data_bit_length int, ringQ *ring.Ring, coeffs []uint64, isRingStandard bool, isFpga bool) {
+
+	for i, v := range values {
+		if isFpga {
+			singleFloatToFixedPointFpga(i, real(v), scale, data_bit_length, coeffs)
+		} else {
+			singleFloatToFixedPoint(i, real(v), scale, ringQ, coeffs)
+		}
+	}
+
+	if isRingStandard {
+		slots := len(values)
+		for i, v := range values {
+			if isFpga {
+				singleFloatToFixedPointFpga(i+slots, imag(v), scale, data_bit_length, coeffs)
+			} else {
+				singleFloatToFixedPoint(i+slots, imag(v), scale, ringQ, coeffs)
+			}
+		}
+	}
+}
+
 func floatToFixedPointCRT(level int, values []float64, scale float64, ringQ *ring.Ring, coeffs [][]uint64) {
 	for i, v := range values {
 		singleFloatToFixedPointCRT(level, i, v, scale, ringQ, coeffs)
@@ -176,6 +198,89 @@ func singleFloatToFixedPointCRT(level, i int, value float64, scale float64, ring
 					coeffs[j][i] = c
 				}
 			}
+		}
+	}
+}
+
+func singleFloatToFixedPoint(i int, value float64, scale float64, ringQ *ring.Ring, coeffs []uint64) {
+
+	var isNegative bool
+	var xFlo *big.Float
+	var xInt *big.Int
+	tmp := new(big.Int)
+	var c uint64
+
+	isNegative = false
+
+	if value < 0 {
+		isNegative = true
+		scale *= -1
+	}
+
+	value *= scale
+
+	moduli := ringQ.Modulus[0]
+
+	if value > 1.8446744073709552e+19 {
+		xFlo = big.NewFloat(value)
+		xFlo.Add(xFlo, big.NewFloat(0.5))
+		xInt = new(big.Int)
+		xFlo.Int(xInt)
+		tmp.Mod(xInt, ring.NewUint(moduli))
+		if isNegative {
+			coeffs[i] = moduli - tmp.Uint64()
+		} else {
+			coeffs[i] = tmp.Uint64()
+		}
+
+	} else {
+		bredParams := ringQ.BredParams[0]
+
+		c = uint64(value + 0.5)
+		if isNegative {
+			if c > moduli {
+				coeffs[i] = moduli - ring.BRedAdd(c, moduli, bredParams)
+			} else {
+				coeffs[i] = moduli - c
+			}
+		} else {
+			if c > 0x1fffffffffffffff {
+				coeffs[i] = ring.BRedAdd(c, moduli, bredParams)
+			} else {
+				coeffs[i] = c
+			}
+		}
+	}
+}
+
+func singleFloatToFixedPointFpga(i int, value float64, scale float64, data_bit_length int, coeffs []uint64) {
+	var xFlo *big.Float
+	var xInt *big.Int
+
+	isNegative := false
+
+	if value < 0 {
+		isNegative = true
+		scale *= -1
+	}
+
+	value *= scale
+
+	if value > 1.8446744073709552e+19 {
+		xFlo = big.NewFloat(value)
+		xFlo.Add(xFlo, big.NewFloat(0.5))
+		xInt = new(big.Int)
+		xFlo.Int(xInt)
+		coeffs[i] = xInt.Uint64()
+	} else {
+		coeffs[i] = uint64(value + 0.5)
+	}
+
+	if isNegative {
+		if data_bit_length <= 32 {
+			coeffs[i] = (1 << 31) + coeffs[i]
+		} else {
+			coeffs[i] = (1 << 63) + coeffs[i]
 		}
 	}
 }

@@ -3,10 +3,10 @@ package lut
 import (
 	"math/big"
 
-	"github.com/tuneinsight/lattigo/v3/ring"
+	"github.com/cipherflow-fhe/lattigo/ring"
 )
 
-//MulBySmallMonomialMod2N multiplies pol by x^n, with 0 <= n < N
+// MulBySmallMonomialMod2N multiplies pol by x^n, with 0 <= n < N
 func MulBySmallMonomialMod2N(mask uint64, pol *ring.Poly, n int) {
 	if n != 0 {
 		N := len(pol.Coeffs[0])

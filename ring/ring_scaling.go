@@ -99,12 +99,13 @@ func (r *Ring) DivRoundByLastModulusLvl(level int, p0, p1 *Poly) {
 	pj := r.Modulus[level]
 	pHalf := (pj - 1) >> 1
 
-	AddScalarVec(p0.Coeffs[level], p0.Coeffs[level], pHalf, pj)
+	p2 := p0.CopyNew()
+	AddScalarVec(p2.Coeffs[level], p2.Coeffs[level], pHalf, pj)
 
 	for i := 0; i < level; i++ {
 		qi := r.Modulus[i]
-		AddScalarNoModAndNegTwoQiNoModVec(p0.Coeffs[i], p0.Coeffs[i], qi-BRedAdd(pHalf, qi, r.BredParams[i]), qi)
-		AddVecNoModAndMulScalarMontgomeryVec(p0.Coeffs[level], p0.Coeffs[i], p1.Coeffs[i], r.RescaleParams[level-1][i], qi, r.MredParams[i])
+		AddScalarNoModAndNegTwoQiNoModVec(p2.Coeffs[i], p2.Coeffs[i], qi-BRedAdd(pHalf, qi, r.BredParams[i]), qi)
+		AddVecNoModAndMulScalarMontgomeryVec(p2.Coeffs[level], p2.Coeffs[i], p1.Coeffs[i], r.RescaleParams[level-1][i], qi, r.MredParams[i])
 	}
 }
 

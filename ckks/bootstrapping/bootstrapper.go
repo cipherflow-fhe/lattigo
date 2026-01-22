@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/tuneinsight/lattigo/v3/ckks"
-	"github.com/tuneinsight/lattigo/v3/ckks/advanced"
-	"github.com/tuneinsight/lattigo/v3/rlwe"
+	"github.com/cipherflow-fhe/lattigo/ckks"
+	"github.com/cipherflow-fhe/lattigo/ckks/advanced"
+	"github.com/cipherflow-fhe/lattigo/rlwe"
 )
 
 // Bootstrapper is a struct to store a memory buffer with the plaintext matrices,
@@ -76,6 +76,7 @@ func NewBootstrapper(params ckks.Parameters, btpParams Parameters, btpKeys Evalu
 }
 
 // GenEvaluationKeys generates the bootstrapping EvaluationKeys, which contain:
+//
 //	Rlk: *rlwe.RelinearizationKey
 //	Rtks: *rlwe.RotationKeySet
 //	SwkDtS: *rlwe.SwitchingKey
@@ -103,10 +104,13 @@ func (p *Parameters) GenEncapsulationSwitchingKeys(params ckks.Parameters, skDen
 		return
 	}
 
+	// Use Q[:1] and full P for GPU compatibility
+	// Original Lattigo used Q[:1] and P[:1] for memory optimization,
+	// but GPU implementation requires full P moduli even at level 0
 	paramsSparse, _ := rlwe.NewParametersFromLiteral(rlwe.ParametersLiteral{
 		LogN: params.LogN(),
 		Q:    params.Q()[:1],
-		P:    params.P()[:1],
+		P:    params.P(),
 	})
 
 	kgenSparse := rlwe.NewKeyGenerator(paramsSparse)

@@ -7,11 +7,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tuneinsight/lattigo/v3/bfv"
-	"github.com/tuneinsight/lattigo/v3/dbfv"
-	"github.com/tuneinsight/lattigo/v3/drlwe"
-	"github.com/tuneinsight/lattigo/v3/rlwe"
-	"github.com/tuneinsight/lattigo/v3/utils"
+	"github.com/cipherflow-fhe/lattigo/bfv"
+	"github.com/cipherflow-fhe/lattigo/dbfv"
+	"github.com/cipherflow-fhe/lattigo/drlwe"
+	"github.com/cipherflow-fhe/lattigo/rlwe"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 func check(err error) {

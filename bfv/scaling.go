@@ -3,8 +3,8 @@ package bfv
 import (
 	"math/big"
 
-	"github.com/tuneinsight/lattigo/v3/ring"
-	"github.com/tuneinsight/lattigo/v3/utils"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 // Scaler is an interface that rescales polynomial coefficients by a fraction t/Q.
@@ -29,6 +29,7 @@ type RNSScaler struct {
 	paramsQP []ring.ModupParams
 
 	tDividesQ bool
+	tPowOf2   bool
 }
 
 // NewRNSScaler creates a new RNSScaler from t, the modulus under which the reconstruction is returned, the Ring in which the polynomial to reconstruct is represented.
@@ -52,6 +53,7 @@ func NewRNSScaler(ringQ *ring.Ring, T uint64) (rnss *RNSScaler) {
 	rnss.buffP = rnss.ringT.NewPoly()
 
 	rnss.tDividesQ = T == ringQ.Modulus[0]
+	rnss.tPowOf2 = (T&(T-1) == 0)
 
 	if !rnss.tDividesQ {
 
@@ -76,7 +78,9 @@ func NewRNSScaler(ringQ *ring.Ring, T uint64) (rnss *RNSScaler) {
 
 			rnss.qInv[i] = tmp.Mod(bigQ, TBig).Uint64()
 			rnss.qInv[i] = ring.ModExp(rnss.qInv[i], T-2, T)
-			rnss.qInv[i] = ring.MForm(rnss.qInv[i], T, bredParams)
+			if !rnss.tPowOf2 {
+				rnss.qInv[i] = ring.MForm(rnss.qInv[i], T, bredParams)
+			}
 
 			rnss.qHalf[i] = new(big.Int).Set(bigQ)
 			rnss.qHalf[i].Rsh(rnss.qHalf[i], 1)
@@ -90,7 +94,6 @@ func NewRNSScaler(ringQ *ring.Ring, T uint64) (rnss *RNSScaler) {
 
 // DivByQOverTRoundedLvl returns p1 scaled by a factor t/Q and mod t on the receiver p2.
 func (rnss *RNSScaler) DivByQOverTRoundedLvl(level int, p1Q, p2T *ring.Poly) {
-
 	ringQ := rnss.ringQ
 
 	if level > 0 {
@@ -104,7 +107,7 @@ func (rnss *RNSScaler) DivByQOverTRoundedLvl(level int, p1Q, p2T *ring.Poly) {
 			p2tmp := p2T.Coeffs[0]
 			p3tmp := rnss.buffP.Coeffs[0]
 			qInv := T - rnss.qInv[level]
-			qHalfModT := T - rnss.qHalfModT[level]
+			// qHalfModT := T - rnss.qHalfModT[level] // FPGA
 
 			// Multiplies P_{Q} by t and extend the basis from P_{Q} to t*(P_{Q}||P_{t})
 			// Since the coefficients of P_{t} are multiplied by t, they are all zero,
@@ -112,13 +115,23 @@ func (rnss *RNSScaler) DivByQOverTRoundedLvl(level int, p1Q, p2T *ring.Poly) {
 			ringQ.MulScalarLvl(level, p1Q, T, rnss.buffQ)
 
 			// Centers t*P_{Q} around (Q-1)/2 to round instead of floor during the division
-			ringQ.AddScalarBigintLvl(level, rnss.buffQ, rnss.qHalf[level], rnss.buffQ)
+			// ringQ.AddScalarBigintLvl(level, rnss.buffQ, rnss.qHalf[level], rnss.buffQ) // FPGA
 
-			// Extends the basis of (t*P_{Q} + (Q-1)/2) to (t*P_{t} + (Q-1)/2)
-			ring.ModUpExact(rnss.buffQ.Coeffs[:level+1], rnss.buffP.Coeffs, ringQ, ringT, rnss.paramsQP[level])
+			if !rnss.tPowOf2 {
+				// Extends the basis of (t*P_{Q} + (Q-1)/2) to (t*P_{t} + (Q-1)/2)
+				ring.ModUpExact(rnss.buffQ.Coeffs[:level+1], rnss.buffP.Coeffs, ringQ, ringT, rnss.paramsQP[level])
 
-			// Computes [Q^{-1} * (t*P_{t} - (t*P_{Q} - ((Q-1)/2 mod t)))] mod t which returns round(t/Q * P_{Q}) mod t
-			ring.AddScalarNoModAndMulScalarMontgomeryVec(p3tmp, p2tmp, qHalfModT, qInv, T, tInv)
+				// Computes [Q^{-1} * (t*P_{t} - (t*P_{Q} - ((Q-1)/2 mod t)))] mod t which returns round(t/Q * P_{Q}) mod t
+				// ring.AddScalarNoModAndMulScalarMontgomeryVec(p3tmp, p2tmp, qHalfModT, qInv, T, tInv) // FPGA
+				ring.AddScalarNoModAndMulScalarMontgomeryVec(p3tmp, p2tmp, 0, qInv, T, tInv)
+			} else {
+				ring.ModUpExactPowOf2(rnss.buffQ.Coeffs[:level+1], rnss.buffP.Coeffs, ringQ, ringT, rnss.paramsQP[level])
+
+				tMask := T - 1
+				for i := 0; i < len(p3tmp); i++ {
+					p2tmp[i] = (p3tmp[i] * qInv) & tMask
+				}
+			}
 		}
 	} else {
 		if rnss.tDividesQ {
@@ -158,7 +171,15 @@ func ScaleUpTCoprimeWithQVecLvl(level int, ringQ, ringT *ring.Ring, tInvModQi, b
 	tInv := ringT.MredParams[0]
 
 	// (x * Q + T/2) mod T
-	ring.MulScalarMontgomeryAndAddScalarVec(pIn.Coeffs[0], buffN, tHalf, qModTmontgomery, t, tInv)
+	if t&(t-1) == 0 {
+		q_mod_t := new(big.Int).Mod(ringQ.ModulusAtLevel[level], ring.NewUint(t)).Uint64()
+		mask := t - 1
+		for j := 0; j < len(pIn.Coeffs[0]); j++ {
+			buffN[j] = (pIn.Coeffs[0][j]*q_mod_t + tHalf) & mask
+		}
+	} else {
+		ring.MulScalarMontgomeryAndAddScalarVec(pIn.Coeffs[0], buffN, tHalf, qModTmontgomery, t, tInv)
+	}
 
 	// (x * T^-1 - T/2) mod Qi
 	for i := 0; i < level+1; i++ {

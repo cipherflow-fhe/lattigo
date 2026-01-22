@@ -1,7 +1,7 @@
 package bfv
 
 import (
-	"github.com/tuneinsight/lattigo/v3/rlwe"
+	"github.com/cipherflow-fhe/lattigo/rlwe"
 )
 
 // Decryptor is an interface wrapping a rlwe.Decryptor.

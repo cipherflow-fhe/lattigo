@@ -8,9 +8,9 @@ import (
 	"math/big"
 	"math/bits"
 
-	"github.com/tuneinsight/lattigo/v3/ring"
-	"github.com/tuneinsight/lattigo/v3/rlwe/ringqp"
-	"github.com/tuneinsight/lattigo/v3/utils"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/rlwe/ringqp"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 // MaxLogN is the log2 of the largest supported polynomial modulus degree.
@@ -70,6 +70,8 @@ type Parameters struct {
 	ringQ    *ring.Ring
 	ringP    *ring.Ring
 	ringType ring.Type
+
+	IsFpga bool
 }
 
 // NewParameters returns a new set of generic RLWE parameters from the given ring degree logn, moduli q and p, and
@@ -99,6 +101,7 @@ func NewParameters(logn int, q, p []uint64, pow2Base, h int, sigma float64, ring
 		h:        h,
 		sigma:    sigma,
 		ringType: ringType,
+		IsFpga:   false,
 	}
 
 	// pre-check that moduli chain is of valid size and that all factors are prime.
@@ -374,14 +377,14 @@ func (p *Parameters) PiOverflowMargin(level int) int {
 	return int(math.Exp2(64) / float64(utils.MaxSliceUint64(p.pi[:level+1])))
 }
 
-// GaloisElementForColumnRotationBy returns the galois element for plaintext
+// GaloisElementForColumnRotationBy returns the Galois element for plaintext
 // column rotations by k position to the left. Providing a negative k is
 // equivalent to a right rotation.
 func (p Parameters) GaloisElementForColumnRotationBy(k int) uint64 {
 	return ring.ModExp(GaloisGen, uint64(k&int(p.ringQ.NthRoot-1)), p.ringQ.NthRoot)
 }
 
-// GaloisElementForRowRotation returns the galois element for generating the row
+// GaloisElementForRowRotation returns the Galois element for generating the row
 // rotation automorphism
 func (p Parameters) GaloisElementForRowRotation() uint64 {
 	if p.ringType == ring.ConjugateInvariant {
@@ -390,7 +393,7 @@ func (p Parameters) GaloisElementForRowRotation() uint64 {
 	return p.ringQ.NthRoot - 1
 }
 
-// GaloisElementsForTrace generates the galois elements for the Trace evaluation.
+// GaloisElementsForTrace generates the Galois elements for the Trace evaluation.
 // Trace maps X -> sum((-1)^i * X^{i*n+1}) for 2^{LogN} <= i < N.
 func (p Parameters) GaloisElementsForTrace(logN int) (galEls []uint64) {
 
@@ -404,16 +407,16 @@ func (p Parameters) GaloisElementsForTrace(logN int) (galEls []uint64) {
 		case ring.Standard:
 			galEls = append(galEls, p.GaloisElementForRowRotation())
 		case ring.ConjugateInvariant:
-			panic("galois element 5^-1 is undefined in ConjugateInvariant Ring")
+			panic("cannot GaloisElementsForTrace: Galois element 5^-1 is undefined in ConjugateInvariant Ring")
 		default:
-			panic("invalid ring type")
+			panic("cannot GaloisElementsForTrace: invalid ring type")
 		}
 	}
 
 	return
 }
 
-// GaloisElementsForRowInnerSum returns a list of all galois elements required to
+// GaloisElementsForRowInnerSum returns a list of all Galois elements required to
 // perform an InnerSum operation. This corresponds to all the left rotations by
 // k-positions where k is a power of two and the row-rotation element.
 func (p Parameters) GaloisElementsForRowInnerSum() (galEls []uint64) {
@@ -428,13 +431,13 @@ func (p Parameters) GaloisElementsForRowInnerSum() (galEls []uint64) {
 	case ring.ConjugateInvariant:
 		galEls[p.logN-1] = p.GaloisElementForColumnRotationBy(1 << (p.logN - 1))
 	default:
-		panic("invalid ring type")
+		panic("cannot GaloisElementsForRowInnerSum: invalid ring type")
 	}
 
 	return galEls
 }
 
-// GaloisElementForExpandRLWE returns the list of galois elements required
+// GaloisElementForExpandRLWE returns the list of Galois elements required
 // to perform the ExpandRLWE operation.
 func (p Parameters) GaloisElementForExpandRLWE(logN int) (galEls []uint64) {
 	galEls = make([]uint64, logN)
@@ -446,14 +449,14 @@ func (p Parameters) GaloisElementForExpandRLWE(logN int) (galEls []uint64) {
 	return
 }
 
-// GaloisElementsForMergeRLWE returns the list of galois elements required
+// GaloisElementsForMergeRLWE returns the list of Galois elements required
 // to perform the MergeRLWE operation.
 func (p Parameters) GaloisElementsForMergeRLWE() (galEls []uint64) {
 	return p.GaloisElementsForRowInnerSum()
 }
 
-// InverseGaloisElement takes a galois element and returns the galois element
-//  corresponding to the inverse automorphism
+// InverseGaloisElement takes a Galois element and returns the Galois element
+// corresponding to the inverse automorphism
 func (p Parameters) InverseGaloisElement(galEl uint64) uint64 {
 	return ring.ModExp(galEl, p.ringQ.NthRoot-1, p.ringQ.NthRoot)
 }
@@ -501,6 +504,7 @@ func (p Parameters) MarshalBinary() ([]byte, error) {
 	// 1 byte : ringType
 	// 8 * (#Q) : Q
 	// 8 * (#P) : P
+	// 8 byte : M_form_bits
 	b := utils.NewBuffer(make([]byte, 0, p.MarshalBinarySize()))
 	b.WriteUint8(uint8(p.logN))
 	b.WriteUint8(uint8(len(p.qi)))
@@ -544,7 +548,7 @@ func (p *Parameters) UnmarshalBinary(data []byte) error {
 
 // MarshalBinarySize returns the length of the []byte encoding of the reciever.
 func (p Parameters) MarshalBinarySize() int {
-	return 21 + (len(p.qi)+len(p.pi))<<3
+	return 22 + (len(p.qi)+len(p.pi))<<3
 }
 
 // MarshalJSON returns a JSON representation of this parameter set. See `Marshal` from the `encoding/json` package.

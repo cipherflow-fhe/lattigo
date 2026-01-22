@@ -7,9 +7,9 @@ import (
 	"math"
 	"math/bits"
 
-	"github.com/tuneinsight/lattigo/v3/ring"
-	"github.com/tuneinsight/lattigo/v3/rlwe"
-	"github.com/tuneinsight/lattigo/v3/utils"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/rlwe"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 var (
@@ -169,7 +169,10 @@ func NewParameters(rlweParams rlwe.Parameters, t uint64) (p Parameters, err erro
 	}
 
 	if ringT, err = ring.NewRing(rlweParams.N(), []uint64{t}); err != nil {
-		return Parameters{}, err
+		fmt.Println(err.Error())
+		if ringT, err = ring.NewRingWithoutNTT(rlweParams.N(), []uint64{t}); err != nil {
+			return Parameters{}, err
+		}
 	}
 
 	return Parameters{rlweParams, ringQMul, ringT}, nil

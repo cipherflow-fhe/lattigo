@@ -4,10 +4,10 @@ import (
 	"errors"
 	"math"
 
-	"github.com/tuneinsight/lattigo/v3/ring"
-	"github.com/tuneinsight/lattigo/v3/rlwe"
-	"github.com/tuneinsight/lattigo/v3/rlwe/ringqp"
-	"github.com/tuneinsight/lattigo/v3/utils"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/rlwe"
+	"github.com/cipherflow-fhe/lattigo/rlwe/ringqp"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 // Operand is a common interface for Ciphertext and Plaintext types.
@@ -80,6 +80,8 @@ type Evaluator interface {
 	RotateHoisted(ctIn *Ciphertext, rotations []int, ctOut map[int]*Ciphertext)
 	RotateHoistedNoModDownNew(level int, rotations []int, c0 *ring.Poly, c2DecompQP []ringqp.Poly) (cOut map[int][2]ringqp.Poly)
 
+	DecomposeNTTNew(levelQ, levelP, nbPi int, c2 *ring.Poly) (BuffDecompQP []ringqp.Poly)
+	AutomorphismHoistedNew(level int, ctIn *Ciphertext, c1DecompQP []ringqp.Poly, galEl uint64) (ctOut *Ciphertext)
 	// ===========================
 	// === Advanced Arithmetic ===
 	// ===========================
@@ -1138,7 +1140,6 @@ func (eval *evaluator) MulRelin(ctIn *Ciphertext, op1 Operand, ctOut *Ciphertext
 }
 
 func (eval *evaluator) mulRelin(ctIn *Ciphertext, op1 Operand, relin bool, ctOut *Ciphertext) {
-
 	eval.checkBinary(ctIn, op1, ctOut, utils.MaxInt(ctIn.Degree(), op1.Degree()))
 
 	level := utils.MinInt(utils.MinInt(ctIn.Level(), op1.Level()), ctOut.Level())
@@ -1212,11 +1213,16 @@ func (eval *evaluator) mulRelin(ctIn *Ciphertext, op1 Operand, relin bool, ctOut
 
 		c00 := eval.buffQ[0]
 
-		ringQ.MFormLvl(level, op1.El().Value[0], c00)
+		if !op1.El().Value[0].IsMForm {
+			ringQ.MFormLvl(level, op1.El().Value[0], c00)
+		} else {
+			c00 = op1.El().Value[0].CopyNew()
+		}
 		for i := range ctIn.Value {
 			ringQ.MulCoeffsMontgomeryLvl(level, ctIn.Value[i], c00, ctOut.Value[i])
 		}
 	}
+
 }
 
 // MulAndAdd multiplies ctIn with op1 without relinearization and adds the result on ctOut.

@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/tuneinsight/lattigo/v3/ckks"
-	ckksAdvanced "github.com/tuneinsight/lattigo/v3/ckks/advanced"
-	"github.com/tuneinsight/lattigo/v3/rgsw/lut"
-	"github.com/tuneinsight/lattigo/v3/ring"
-	"github.com/tuneinsight/lattigo/v3/rlwe"
+	"github.com/cipherflow-fhe/lattigo/ckks"
+	ckksAdvanced "github.com/cipherflow-fhe/lattigo/ckks/advanced"
+	"github.com/cipherflow-fhe/lattigo/rgsw/lut"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/rlwe"
 )
 
 // This example showcases how lookup tables can complement the CKKS scheme to compute non-linear functions

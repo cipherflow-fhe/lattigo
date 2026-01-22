@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"math/bits"
 
-	"github.com/tuneinsight/lattigo/v3/utils"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 func (r *Ring) minLevelTernary(p1, p2, p3 *Poly) int {
@@ -24,7 +24,10 @@ func (r *Ring) Add(p1, p2, p3 *Poly) {
 // q_0 up to q_level and writes the result on p3.
 func (r *Ring) AddLvl(level int, p1, p2, p3 *Poly) {
 	for i := 0; i < level+1; i++ {
-		AddVec(p1.Coeffs[i][:r.N], p2.Coeffs[i][:r.N], p3.Coeffs[i][:r.N], r.Modulus[i])
+		AddVec(p1.Coeffs[i][:r.N],
+			p2.Coeffs[i][:r.N],
+			p3.Coeffs[i][:r.N],
+			r.Modulus[i])
 	}
 }
 
@@ -387,7 +390,7 @@ func (r *Ring) MulScalarBigint(p1 *Poly, scalar *big.Int, p2 *Poly) {
 }
 
 // MulScalarBigintLvl multiplies each coefficient of p1 by a big.Int scalar
-//for the moduli from q_0 up to q_level and writes the result on p2.
+// for the moduli from q_0 up to q_level and writes the result on p2.
 func (r *Ring) MulScalarBigintLvl(level int, p1 *Poly, scalar *big.Int, p2 *Poly) {
 	scalarQi := new(big.Int)
 	for i := 0; i < level+1; i++ {
@@ -414,6 +417,7 @@ func (r *Ring) MFormLvl(level int, p1, p2 *Poly) {
 	for i := 0; i < level+1; i++ {
 		MFormVec(p1.Coeffs[i][:r.N], p2.Coeffs[i][:r.N], r.Modulus[i], r.BredParams[i])
 	}
+	p2.IsMForm = true
 }
 
 // MFormConstantLvl switches p1 to the Montgomery domain for the moduli from q_0 up to q_level and writes the result on p2.
@@ -452,6 +456,12 @@ func (r *Ring) MulByPow2(p1 *Poly, pow2 int, p2 *Poly) {
 func (r *Ring) MulByPow2Lvl(level int, p1 *Poly, pow2 int, p2 *Poly) {
 	r.MFormLvl(level, p1, p2)
 	for i := 0; i < level+1; i++ {
+		MulByPow2Vec(p2.Coeffs[i][:r.N], p2.Coeffs[i][:r.N], pow2, r.Modulus[i], r.MredParams[i])
+	}
+}
+
+func (r *Ring) InvMFormAndMulByPow2(p1 *Poly, pow2 int, p2 *Poly) {
+	for i := 0; i < p1.Level()+1; i++ {
 		MulByPow2Vec(p1.Coeffs[i][:r.N], p2.Coeffs[i][:r.N], pow2, r.Modulus[i], r.MredParams[i])
 	}
 }

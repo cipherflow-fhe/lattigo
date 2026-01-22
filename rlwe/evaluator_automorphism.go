@@ -3,9 +3,9 @@ package rlwe
 import (
 	"fmt"
 
-	"github.com/tuneinsight/lattigo/v3/ring"
-	"github.com/tuneinsight/lattigo/v3/rlwe/ringqp"
-	"github.com/tuneinsight/lattigo/v3/utils"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/rlwe/ringqp"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 // Automorphism computes phi(ct), where phi is the map X -> X^galEl. The method requires
@@ -49,7 +49,7 @@ func (eval *Evaluator) Automorphism(ctIn *Ciphertext, galEl uint64, ctOut *Ciphe
 
 // AutomorphismHoisted is similar to Automorphism, except that it takes as input ctIn and c1DecompQP, where c1DecompQP is the RNS
 // decomposition of its element of degree 1. This decomposition can be obtained with DecomposeNTT.
-// The method requires that the corresponding RotationKey  has been added to the Evaluator.
+// The method requires that the corresponding RotationKey has been added to the Evaluator.
 // The method will panic if either ctIn or ctOut degree is not equal to 1.
 func (eval *Evaluator) AutomorphismHoisted(level int, ctIn *Ciphertext, c1DecompQP []ringqp.Poly, galEl uint64, ctOut *Ciphertext) {
 
@@ -70,8 +70,14 @@ func (eval *Evaluator) AutomorphismHoisted(level int, ctIn *Ciphertext, c1Decomp
 	}
 
 	ringQ := eval.params.RingQ()
+	levelQ := eval.params.QCount() - 1
 
 	eval.KeyswitchHoisted(level, c1DecompQP, rtk, eval.BuffQP[0].Q, eval.BuffQP[1].Q, eval.BuffQP[0].P, eval.BuffQP[1].P)
+	if !ctIn.Value[0].IsNTT {
+		ringQ.InvNTTLvl(levelQ, eval.BuffQP[0].Q, eval.BuffQP[0].Q)
+		ringQ.InvNTTLvl(levelQ, eval.BuffQP[1].Q, eval.BuffQP[1].Q)
+	}
+
 	ringQ.AddLvl(level, eval.BuffQP[0].Q, ctIn.Value[0], eval.BuffQP[0].Q)
 
 	if ctIn.Value[0].IsNTT {
@@ -91,7 +97,7 @@ func (eval *Evaluator) AutomorphismHoistedNoModDown(levelQ int, c0 *ring.Poly, c
 
 	rtk, generated := eval.Rtks.GetRotationKey(galEl)
 	if !generated {
-		panic(fmt.Sprintf("galEl key 5^%d missing", eval.params.InverseGaloisElement(galEl)))
+		panic(fmt.Sprintf("cannot AutomorphismHoistedNoModDown: galEl key 5^%d missing", eval.params.InverseGaloisElement(galEl)))
 	}
 
 	levelP := rtk.LevelP()
@@ -131,21 +137,21 @@ func (eval *Evaluator) AutomorphismHoistedNoModDown(levelQ int, c0 *ring.Poly, c
 }
 
 // Trace maps X -> sum((-1)^i * X^{i*n+1}) for n <= i < N
-// Monomial X^k vanishes if k is not divisible by (N/n), else it is multiplied by (N/n).
+// Monomial X^k vanishes if k is not divisible by (N/n), otherwise it is multiplied by (N/n).
 // Ciphertext is pre-multiplied by (N/n)^-1 to remove the (N/n) factor.
 // Examples of full Trace for [0 + 1X + 2X^2 + 3X^3 + 4X^4 + 5X^5 + 6X^6 + 7X^7]
 //
 // 1)	   [1 + 2X + 3X^2 + 4X^3 + 5X^4 + 6X^5 + 7X^6 + 8X^7]
-//       + [1 - 6X - 3X^2 + 8X^3 + 5X^4 + 2X^5 - 7X^6 - 4X^7]  {X-> X^(i * 5^1)}
-//   	 = [2 - 4X + 0X^2 +12X^3 +10X^4 + 8X^5 - 0X^6 + 4X^7]
+//   - [1 - 6X - 3X^2 + 8X^3 + 5X^4 + 2X^5 - 7X^6 - 4X^7]  {X-> X^(i * 5^1)}
+//     = [2 - 4X + 0X^2 +12X^3 +10X^4 + 8X^5 - 0X^6 + 4X^7]
 //
 // 2)      [2 - 4X + 0X^2 +12X^3 +10X^4 + 8X^5 - 0X^6 + 4X^7]
-//       + [2 + 4X + 0X^2 -12X^3 +10X^4 - 8X^5 + 0X^6 - 4X^7]  {X-> X^(i * 5^2)}
-//       = [4 + 0X + 0X^2 - 0X^3 +20X^4 + 0X^5 + 0X^6 - 0X^7]
+//   - [2 + 4X + 0X^2 -12X^3 +10X^4 - 8X^5 + 0X^6 - 4X^7]  {X-> X^(i * 5^2)}
+//     = [4 + 0X + 0X^2 - 0X^3 +20X^4 + 0X^5 + 0X^6 - 0X^7]
 //
 // 3)      [4 + 0X + 0X^2 - 0X^3 +20X^4 + 0X^5 + 0X^6 - 0X^7]
-//       + [4 + 0X + 0X^2 - 0X^3 -20X^4 + 0X^5 + 0X^6 - 0X^7]  {X-> X^(i * -1)}
-//       = [8 + 0X + 0X^2 - 0X^3 + 0X^4 + 0X^5 + 0X^6 - 0X^7]
+//   - [4 + 0X + 0X^2 - 0X^3 -20X^4 + 0X^5 + 0X^6 - 0X^7]  {X-> X^(i * -1)}
+//     = [8 + 0X + 0X^2 - 0X^3 + 0X^4 + 0X^5 + 0X^6 - 0X^7]
 func (eval *Evaluator) Trace(ctIn *Ciphertext, logN int, ctOut *Ciphertext) {
 
 	levelQ := utils.MinInt(ctIn.Level(), ctOut.Level())

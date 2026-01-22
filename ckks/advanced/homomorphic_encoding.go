@@ -3,8 +3,8 @@ package advanced
 import (
 	"math"
 
-	"github.com/tuneinsight/lattigo/v3/ckks"
-	"github.com/tuneinsight/lattigo/v3/utils"
+	"github.com/cipherflow-fhe/lattigo/ckks"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 // LinearTransformType is a type used to distinguish different linear transformations.

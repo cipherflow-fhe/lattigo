@@ -26,9 +26,9 @@ func NewPoly(N, Level int) (pol *Poly) {
 	return
 }
 
-// Resize resize the level of the target polynomial to the provided level.
+// Resize resizes the level of the target polynomial to the provided level.
 // If the provided level is larger than the current level, then allocates zero
-// coefficients, else dereferences the coefficients above the provided level.
+// coefficients, otherwise dereferences the coefficients above the provided level.
 func (pol *Poly) Resize(level int) {
 	N := pol.N()
 	if pol.Level() > level {
@@ -139,6 +139,10 @@ func (pol *Poly) Equals(other *Poly) bool {
 	return false
 }
 
+func mega_data_len() int {
+	return 8
+}
+
 // GetDataLen64 returns the number of bytes a polynomial of N coefficients
 // with Level+1 moduli will take when converted to a slice of bytes.
 // Assumes that each coefficient will be encoded on 8 bytes.
@@ -147,7 +151,7 @@ func GetDataLen64(N, Level int, WithMetadata bool) (cnt int) {
 	cnt += N * (Level + 1) << 3
 
 	if WithMetadata {
-		cnt += 7
+		cnt += mega_data_len()
 	}
 
 	return
@@ -183,7 +187,7 @@ func (pol *Poly) UnmarshalBinary(data []byte) (err error) {
 		pol.IsMForm = true
 	}
 
-	pointer := 7
+	pointer := mega_data_len()
 
 	if ((len(data) - pointer) >> 3) != N*(Level+1) {
 		return errors.New("invalid polynomial encoding")
@@ -220,7 +224,7 @@ func (pol *Poly) WriteTo64(data []byte) (int, error) {
 		data[6] = 1
 	}
 
-	return WriteCoeffsTo64(7, pol.Buff, data)
+	return WriteCoeffsTo64(mega_data_len(), pol.Buff, data)
 }
 
 // WriteCoeffsTo64 converts a matrix of coefficients to a byte array, using 8 bytes per coefficient.
@@ -232,9 +236,9 @@ func WriteCoeffsTo64(pointer int, coeffs []uint64, data []byte) (int, error) {
 	return pointer + len(coeffs)*8, nil
 }
 
-// DecodePoly64 decodes a slice of bytes in the target polynomial returns the number of bytes decoded.
+// DecodePoly64 decodes a slice of bytes in the target polynomial and returns the number of bytes decoded.
 // The method will first try to write on the buffer. If this step fails, either because the buffer isn't
-// allocated or of the wrong size, the method will allocate the correct buffer.
+// allocated or because it is of the wrong size, the method will allocate the correct buffer.
 // Assumes that each coefficient is encoded on 8 bytes.
 func (pol *Poly) DecodePoly64(data []byte) (pointer int, err error) {
 
@@ -249,7 +253,7 @@ func (pol *Poly) DecodePoly64(data []byte) (pointer int, err error) {
 		pol.IsMForm = true
 	}
 
-	pointer = 7
+	pointer = mega_data_len()
 
 	if pol.Buff == nil || len(pol.Buff) != N*(Level+1) {
 		pol.Buff = make([]uint64, N*(Level+1))
@@ -301,7 +305,7 @@ func (pol *Poly) WriteTo32(data []byte) (int, error) {
 		data[6] = 1
 	}
 
-	cnt, err := WriteCoeffsTo32(7, pol.Buff, data)
+	cnt, err := WriteCoeffsTo32(mega_data_len(), pol.Buff, data)
 
 	return cnt, err
 }
@@ -323,7 +327,7 @@ func GetPolyDataLen32(N, Level int, WithMetadata bool) (cnt int) {
 	cnt += N * (Level + 1) << 2
 
 	if WithMetadata {
-		cnt += 7
+		cnt += mega_data_len()
 	}
 
 	return
@@ -338,7 +342,7 @@ func (pol *Poly) GetDataLen32(WithMetadata bool) (cnt int) {
 
 // DecodePoly32 decodes a slice of bytes in the target polynomial returns the number of bytes decoded.
 // The method will first try to write on the buffer. If this step fails, either because the buffer isn't
-// allocated or of the wrong size, the method will allocate the correct buffer.
+// allocated or because it is of the wrong size, the method will allocate the correct buffer.
 // Assumes that each coefficient is encoded on 8 bytes.
 func (pol *Poly) DecodePoly32(data []byte) (pointer int, err error) {
 
@@ -353,7 +357,7 @@ func (pol *Poly) DecodePoly32(data []byte) (pointer int, err error) {
 		pol.IsMForm = true
 	}
 
-	pointer = 7
+	pointer = mega_data_len()
 
 	if pol.Buff == nil || len(pol.Buff) != N*(Level+1) {
 		pol.Buff = make([]uint64, N*(Level+1))

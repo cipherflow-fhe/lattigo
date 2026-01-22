@@ -1,8 +1,8 @@
 package ckks
 
 import (
-	"github.com/tuneinsight/lattigo/v3/rlwe"
-	"github.com/tuneinsight/lattigo/v3/utils"
+	"github.com/cipherflow-fhe/lattigo/rlwe"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 // Encryptor an encryption interface for the CKKS scheme.
@@ -13,6 +13,7 @@ type Encryptor interface {
 	EncryptZeroNew(level int, scale float64) *Ciphertext
 	ShallowCopy() Encryptor
 	WithKey(key interface{}) Encryptor
+	EncryptCompressed(plaintext *Plaintext, ciphertext *CompressedCiphertext)
 }
 
 // PRNGEncryptor is an interface for encrypting BFV ciphertexts from a secret-key and
@@ -69,6 +70,11 @@ func (enc *encryptor) EncryptZeroNew(level int, scale float64) *Ciphertext {
 	ct := NewCiphertext(enc.params, 1, level, scale)
 	enc.Encryptor.EncryptZero(ct.Ciphertext)
 	return ct
+}
+
+func (enc *encryptor) EncryptCompressed(plaintext *Plaintext, ciphertext *CompressedCiphertext) {
+	enc.Encryptor.Encrypt(&rlwe.Plaintext{Value: plaintext.Value}, ciphertext.CompressedCiphertext)
+	ciphertext.Scale = plaintext.Scale
 }
 
 // ShallowCopy creates a shallow copy of this encryptor in which all the read-only data-structures are

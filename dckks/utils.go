@@ -4,9 +4,9 @@ import (
 	"math"
 	"math/bits"
 
-	"github.com/tuneinsight/lattigo/v3/ckks"
-	"github.com/tuneinsight/lattigo/v3/ring"
-	"github.com/tuneinsight/lattigo/v3/rlwe"
+	"github.com/cipherflow-fhe/lattigo/ckks"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/rlwe"
 )
 
 // GetMinimumLevelForBootstrapping takes the security parameter lambda, the ciphertext scale, the number of parties and the moduli chain

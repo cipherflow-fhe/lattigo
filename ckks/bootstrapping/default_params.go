@@ -1,9 +1,9 @@
 package bootstrapping
 
 import (
-	"github.com/tuneinsight/lattigo/v3/ckks"
-	"github.com/tuneinsight/lattigo/v3/ckks/advanced"
-	"github.com/tuneinsight/lattigo/v3/rlwe"
+	"github.com/cipherflow-fhe/lattigo/ckks"
+	"github.com/cipherflow-fhe/lattigo/ckks/advanced"
+	"github.com/cipherflow-fhe/lattigo/rlwe"
 )
 
 type defaultParametersLiteral struct {

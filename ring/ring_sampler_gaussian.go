@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"math"
 
-	"github.com/tuneinsight/lattigo/v3/utils"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 // GaussianSampler keeps the state of a truncated Gaussian polynomial sampler.
@@ -125,7 +125,8 @@ func randFloat64(randomBytes []byte) float64 {
 // To produce a different normal distribution, callers can
 // adjust the output using:
 //
-//  sample = NormFloat64() * desiredStdDev + desiredMean
+//	sample = NormFloat64() * desiredStdDev + desiredMean
+//
 // Algorithm adapted from https://golang.org/src/math/rand/normal.go
 // to use a secure PRNG instead of math/rand.
 func (gaussianSampler *GaussianSampler) normFloat64() (float64, uint64) {

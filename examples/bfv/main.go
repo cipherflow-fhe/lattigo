@@ -5,11 +5,11 @@ import (
 	"math"
 	"math/bits"
 
-	"github.com/tuneinsight/lattigo/v3/rlwe"
-	"github.com/tuneinsight/lattigo/v3/utils"
+	"github.com/cipherflow-fhe/lattigo/rlwe"
+	"github.com/cipherflow-fhe/lattigo/utils"
 
-	"github.com/tuneinsight/lattigo/v3/bfv"
-	"github.com/tuneinsight/lattigo/v3/ring"
+	"github.com/cipherflow-fhe/lattigo/bfv"
+	"github.com/cipherflow-fhe/lattigo/ring"
 )
 
 func obliviousRiding() {

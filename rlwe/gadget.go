@@ -1,8 +1,8 @@
 package rlwe
 
 import (
-	"github.com/tuneinsight/lattigo/v3/ring"
-	"github.com/tuneinsight/lattigo/v3/rlwe/ringqp"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/rlwe/ringqp"
 )
 
 // GadgetCiphertext is a struct for storing an encrypted
@@ -19,6 +19,7 @@ func NewGadgetCiphertext(levelQ, levelP, decompRNS, decompBIT int, ringQP ringqp
 	for i := 0; i < decompRNS; i++ {
 		ct.Value[i] = make([]CiphertextQP, decompBIT)
 		for j := 0; j < decompBIT; j++ {
+			ct.Value[i][j].Seed = make([]byte, 64)
 			ct.Value[i][j].Value[0] = ringQP.NewPolyLvl(levelQ, levelP)
 			ct.Value[i][j].Value[1] = ringQP.NewPolyLvl(levelQ, levelP)
 
@@ -82,6 +83,7 @@ func (ct *GadgetCiphertext) CopyNew() (ctCopy *GadgetCiphertext) {
 	}
 	Value := make([][]CiphertextQP, len(ct.Value))
 	for i := range ct.Value {
+		Value[i] = make([]CiphertextQP, len(ct.Value[i]))
 		for j, el := range ct.Value[i] {
 			Value[i][j] = CiphertextQP{Value: [2]ringqp.Poly{el.Value[0].CopyNew(), el.Value[1].CopyNew()}}
 		}
@@ -106,6 +108,22 @@ func (ct *GadgetCiphertext) GetDataLen(WithMetadata bool) (dataLen int) {
 	return
 }
 
+func (ct *GadgetCiphertext) GetDataLen32(WithMetadata bool) (dataLen int) {
+
+	if WithMetadata {
+		dataLen += 2
+	}
+
+	for i := range ct.Value {
+		for _, el := range ct.Value[i] {
+			dataLen += el.Value[0].GetDataLen32(WithMetadata)
+			dataLen += el.Value[1].GetDataLen32(WithMetadata)
+		}
+	}
+
+	return
+}
+
 // MarshalBinary encodes the target Ciphertext on a slice of bytes.
 func (ct *GadgetCiphertext) MarshalBinary() (data []byte, err error) {
 	data = make([]byte, ct.GetDataLen(true))
@@ -116,7 +134,7 @@ func (ct *GadgetCiphertext) MarshalBinary() (data []byte, err error) {
 	return
 }
 
-// UnmarshalBinary decode a slice of bytes on the target Ciphertext.
+// UnmarshalBinary decodes a slice of bytes on the target Ciphertext.
 func (ct *GadgetCiphertext) UnmarshalBinary(data []byte) (err error) {
 	if _, err = ct.Decode(data); err != nil {
 		return
@@ -145,6 +163,34 @@ func (ct *GadgetCiphertext) Encode(pointer int, data []byte) (int, error) {
 			pointer += inc
 
 			if inc, err = el.Value[1].WriteTo64(data[pointer:]); err != nil {
+				return pointer, err
+			}
+			pointer += inc
+		}
+	}
+
+	return pointer, nil
+}
+
+func (ct *GadgetCiphertext) Encode32(pointer int, data []byte) (int, error) {
+
+	var err error
+	var inc int
+
+	data[pointer] = uint8(len(ct.Value))
+	pointer++
+	data[pointer] = uint8(len(ct.Value[0]))
+	pointer++
+
+	for i := range ct.Value {
+		for _, el := range ct.Value[i] {
+
+			if inc, err = el.Value[0].WriteTo32(data[pointer:]); err != nil {
+				return pointer, err
+			}
+			pointer += inc
+
+			if inc, err = el.Value[1].WriteTo32(data[pointer:]); err != nil {
 				return pointer, err
 			}
 			pointer += inc
@@ -187,6 +233,38 @@ func (ct *GadgetCiphertext) Decode(data []byte) (pointer int, err error) {
 	return
 }
 
+func (ct *GadgetCiphertext) Decode32(data []byte) (pointer int, err error) {
+
+	decompRNS := int(data[0])
+	decompBIT := int(data[1])
+
+	pointer = 2
+
+	ct.Value = make([][]CiphertextQP, decompRNS)
+
+	var inc int
+
+	for i := range ct.Value {
+
+		ct.Value[i] = make([]CiphertextQP, decompBIT)
+
+		for j := range ct.Value[i] {
+
+			if inc, err = ct.Value[i][j].Value[0].DecodePoly32(data[pointer:]); err != nil {
+				return
+			}
+			pointer += inc
+
+			if inc, err = ct.Value[i][j].Value[1].DecodePoly32(data[pointer:]); err != nil {
+				return
+			}
+			pointer += inc
+		}
+	}
+
+	return
+}
+
 // AddPolyTimesGadgetVectorToGadgetCiphertext takes a plaintext polynomial and a list of Ciphertexts and adds the
 // plaintext times the RNS and BIT decomposition to the i-th element of the i-th Ciphertexts. This method panics if
 // len(cts) > 2.
@@ -197,7 +275,7 @@ func AddPolyTimesGadgetVectorToGadgetCiphertext(pt *ring.Poly, cts []GadgetCiphe
 	levelP := cts[0].LevelP()
 
 	if len(cts) > 2 {
-		panic("len(cts) should be <= 2")
+		panic("cannot AddPolyTimesGadgetVectorToGadgetCiphertext: len(cts) should be <= 2")
 	}
 
 	if levelP != -1 {
@@ -250,7 +328,7 @@ func AddPolyTimesGadgetVectorToGadgetCiphertext(pt *ring.Poly, cts []GadgetCiphe
 	}
 }
 
-// AddPolyToGadgetMatrix takes a plaintext polynomial and a list of ringqp.Poly adds the
+// AddPolyToGadgetMatrix takes a plaintext polynomial and a list of ringqp.Poly and adds the
 // plaintext times the RNS and BIT decomposition to the list of ringqp.Poly.
 func AddPolyToGadgetMatrix(pt *ring.Poly, gm [][]ringqp.Poly, ringQP ringqp.Ring, logbase2 int, buff *ring.Poly) {
 
@@ -306,7 +384,7 @@ func AddPolyToGadgetMatrix(pt *ring.Poly, gm [][]ringqp.Poly, ringQP ringqp.Ring
 	}
 }
 
-// GadgetPlaintext stores an RGSW plaintext value.
+// GadgetPlaintext stores a RGSW plaintext value.
 type GadgetPlaintext struct {
 	Value []*ring.Poly
 }
@@ -340,7 +418,7 @@ func NewGadgetPlaintext(value interface{}, levelQ, levelP, logBase2, decompBIT i
 	case *ring.Poly:
 		pt.Value[0] = el.CopyNew()
 	default:
-		panic("unsupported type, must be wither uint64 or *ring.Poly")
+		panic("cannot NewGadgetPlaintext: unsupported type, must be wither uint64 or *ring.Poly")
 	}
 
 	if levelP > -1 {

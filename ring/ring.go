@@ -11,10 +11,10 @@ import (
 	"math/big"
 	"math/bits"
 
-	"github.com/tuneinsight/lattigo/v3/utils"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
-// GaloisGen is an integer of order N/2 modulo M and that spans Z_M with the integer -1.
+// GaloisGen is an integer of order N/2 modulo M that spans Z_M with the integer -1.
 // The j-th ring automorphism takes the root zeta to zeta^(5j).
 const GaloisGen uint64 = 5
 
@@ -144,6 +144,15 @@ func NewRingWithCustomNTT(N int, Moduli []uint64, ntt NumberTheoreticTransformer
 		return r, err
 	}
 
+	return r, nil
+}
+
+func NewRingWithoutNTT(N int, Moduli []uint64) (r *Ring, err error) {
+	r = new(Ring)
+	err = r.setParameters(N, Moduli)
+	if err != nil {
+		return nil, err
+	}
 	return r, nil
 }
 

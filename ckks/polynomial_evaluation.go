@@ -8,8 +8,8 @@ import (
 	"math/bits"
 	"runtime"
 
-	"github.com/tuneinsight/lattigo/v3/ring"
-	"github.com/tuneinsight/lattigo/v3/utils"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 // Polynomial is a struct storing the coefficients of a polynomial

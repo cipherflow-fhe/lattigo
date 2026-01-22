@@ -1,10 +1,10 @@
 package dbfv
 
 import (
-	"github.com/tuneinsight/lattigo/v3/bfv"
-	"github.com/tuneinsight/lattigo/v3/drlwe"
-	"github.com/tuneinsight/lattigo/v3/ring"
-	"github.com/tuneinsight/lattigo/v3/rlwe"
+	"github.com/cipherflow-fhe/lattigo/bfv"
+	"github.com/cipherflow-fhe/lattigo/drlwe"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/rlwe"
 )
 
 // RefreshProtocol is a struct storing the relevant parameters for the Refresh protocol.

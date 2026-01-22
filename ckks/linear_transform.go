@@ -3,9 +3,9 @@ package ckks
 import (
 	"runtime"
 
-	"github.com/tuneinsight/lattigo/v3/ring"
-	"github.com/tuneinsight/lattigo/v3/rlwe/ringqp"
-	"github.com/tuneinsight/lattigo/v3/utils"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/rlwe/ringqp"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 // Trace maps X -> sum((-1)^i * X^{i*n+1}) for 0 <= i < N
@@ -15,16 +15,16 @@ import (
 // Examples of full Trace for [0 + 1X + 2X^2 + 3X^3 + 4X^4 + 5X^5 + 6X^6 + 7X^7]
 //
 // 1)	   [1 + 2X + 3X^2 + 4X^3 + 5X^4 + 6X^5 + 7X^6 + 8X^7]
-//       + [1 - 6X - 3X^2 + 8X^3 + 5X^4 + 2X^5 - 7X^6 - 4X^7]  {X-> X^(i * 5^1)}
-//   	 = [2 - 4X + 0X^2 +12X^3 +10X^4 + 8X^5 - 0X^6 + 4X^7]
+//   - [1 - 6X - 3X^2 + 8X^3 + 5X^4 + 2X^5 - 7X^6 - 4X^7]  {X-> X^(i * 5^1)}
+//     = [2 - 4X + 0X^2 +12X^3 +10X^4 + 8X^5 - 0X^6 + 4X^7]
 //
 // 2)      [2 - 4X + 0X^2 +12X^3 +10X^4 + 8X^5 - 0X^6 + 4X^7]
-//       + [2 + 4X + 0X^2 -12X^3 +10X^4 - 8X^5 + 0X^6 - 4X^7]  {X-> X^(i * 5^2)}
-//       = [4 + 0X + 0X^2 - 0X^3 +20X^4 + 0X^5 + 0X^6 - 0X^7]
+//   - [2 + 4X + 0X^2 -12X^3 +10X^4 - 8X^5 + 0X^6 - 4X^7]  {X-> X^(i * 5^2)}
+//     = [4 + 0X + 0X^2 - 0X^3 +20X^4 + 0X^5 + 0X^6 - 0X^7]
 //
 // 3)      [4 + 0X + 0X^2 - 0X^3 +20X^4 + 0X^5 + 0X^6 - 0X^7]
-//       + [4 + 4X + 0X^2 - 0X^3 -20X^4 + 0X^5 + 0X^6 - 0X^7]  {X-> X^(i * -1)}
-//       = [8 + 0X + 0X^2 - 0X^3 + 0X^4 + 0X^5 + 0X^6 - 0X^7]
+//   - [4 + 4X + 0X^2 - 0X^3 -20X^4 + 0X^5 + 0X^6 - 0X^7]  {X-> X^(i * -1)}
+//     = [8 + 0X + 0X^2 - 0X^3 + 0X^4 + 0X^5 + 0X^6 - 0X^7]
 func (eval *evaluator) Trace(ctIn *Ciphertext, logSlots int, ctOut *Ciphertext) {
 	eval.Evaluator.Trace(ctIn.Ciphertext, logSlots, ctOut.Ciphertext)
 	ctOut.Scale = ctIn.Scale
@@ -59,6 +59,24 @@ func (eval *evaluator) RotateHoisted(ctIn *Ciphertext, rotations []int, ctOut ma
 		eval.AutomorphismHoisted(levelQ, ctIn.Ciphertext, eval.BuffDecompQP, eval.params.GaloisElementForColumnRotationBy(i), ctOut[i].Ciphertext)
 		ctOut[i].Scale = ctIn.Scale
 	}
+}
+
+func (eval *evaluator) DecomposeNTTNew(levelQ, levelP, nbPi int, c2 *ring.Poly) (BuffDecompQP []ringqp.Poly) {
+	decompRNS := eval.params.DecompRNS(eval.params.QCount()-1, eval.params.PCount()-1)
+	BuffDecompQP = make([]ringqp.Poly, decompRNS)
+	ringQP := eval.params.RingQP()
+	for i := 0; i < decompRNS; i++ {
+		BuffDecompQP[i] = ringQP.NewPoly()
+	}
+
+	eval.DecomposeNTT(levelQ, levelP, nbPi, c2, BuffDecompQP)
+	return
+}
+
+func (eval *evaluator) AutomorphismHoistedNew(level int, ctIn *Ciphertext, c1DecompQP []ringqp.Poly, galEl uint64) (ctOut *Ciphertext) {
+	ctOut = NewCiphertext(eval.params, 1, ctIn.Level(), ctIn.Scale)
+	eval.AutomorphismHoisted(level, ctIn.Ciphertext, c1DecompQP, galEl, ctOut.Ciphertext)
+	return
 }
 
 // LinearTransform is a type for linear transformations on ciphertexts.
@@ -466,7 +484,7 @@ func (eval *evaluator) LinearTransform(ctIn *Ciphertext, linearTransform interfa
 // It then replaces all values of those sub-vectors by the component-wise average between all the sub-vectors.
 // Example for batchSize=4 and slots=8: [{a, b, c, d}, {e, f, g, h}] -> [0.5*{a+e, b+f, c+g, d+h}, 0.5*{a+e, b+f, c+g, d+h}]
 // Operation requires log2(SlotCout/'batchSize') rotations.
-// Required rotation keys can be generated with 'RotationsForInnerSumLog(batchSize, SlotCount/batchSize)''
+// Required rotation keys can be generated with 'RotationsForInnerSumLog(batchSize, SlotCount/batchSize)”
 func (eval *evaluator) Average(ctIn *Ciphertext, logBatchSize int, ctOut *Ciphertext) {
 
 	if logBatchSize > eval.params.LogSlots() {

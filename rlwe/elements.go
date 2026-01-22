@@ -3,9 +3,9 @@ package rlwe
 import (
 	"math/big"
 
-	"github.com/tuneinsight/lattigo/v3/ring"
-	"github.com/tuneinsight/lattigo/v3/rlwe/ringqp"
-	"github.com/tuneinsight/lattigo/v3/utils"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/rlwe/ringqp"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 // Plaintext is a common base type for RLWE plaintexts.
@@ -13,14 +13,21 @@ type Plaintext struct {
 	Value *ring.Poly
 }
 
-// Ciphertext is a generic type for RLWE ciphertext.
+// Ciphertext is a generic type for RLWE ciphertexts.
 type Ciphertext struct {
 	Value []*ring.Poly
 }
 
-// CiphertextQP is a generic type for RLWE ciphertext in R_qp.
+type CompressedCiphertext struct {
+	Value *ring.Poly
+	Seed  []byte
+}
+
+// CiphertextQP is a generic type for RLWE ciphertexts in R_qp.
 type CiphertextQP struct {
-	Value [2]ringqp.Poly
+	Compressed bool
+	Value      [2]ringqp.Poly
+	Seed       []byte
 }
 
 // AdditiveShare is a type for storing additively shared values in Z_Q[X] (RNS domain)
@@ -34,19 +41,19 @@ type AdditiveShareBigint struct {
 	Value []*big.Int
 }
 
-// NewAdditiveShare instantiate a new additive share struct for the ring defined
+// NewAdditiveShare instantiates a new additive share struct for the ring defined
 // by the given parameters at maximum level.
 func NewAdditiveShare(params Parameters) *AdditiveShare {
 	return &AdditiveShare{Value: *ring.NewPoly(params.N(), 0)}
 }
 
-// NewAdditiveShareAtLevel instantiate a new additive share struct for the ring defined
+// NewAdditiveShareAtLevel instantiates a new additive share struct for the ring defined
 // by the given parameters at level `level`.
 func NewAdditiveShareAtLevel(params Parameters, level int) *AdditiveShare {
 	return &AdditiveShare{Value: *ring.NewPoly(params.N(), level)}
 }
 
-// NewAdditiveShareBigint instantiate a new additive share struct composed of "n" big.Int elements
+// NewAdditiveShareBigint instantiates a new additive share struct composed of "n" big.Int elements
 func NewAdditiveShareBigint(params Parameters, n int) *AdditiveShareBigint {
 	v := make([]*big.Int, n)
 	for i := range v {
@@ -60,9 +67,9 @@ func NewPlaintext(params Parameters, level int) *Plaintext {
 	return &Plaintext{Value: ring.NewPoly(params.N(), level)}
 }
 
-// NewPlaintextAtLevelFromPoly construct a new Plaintext at a specific level
+// NewPlaintextAtLevelFromPoly constructs a new Plaintext at a specific level
 // where the message is set to the passed poly. No checks are performed on poly and
-// the returned Plaintext will share its backing array of coefficient.
+// the returned Plaintext will share its backing array of coefficients.
 func NewPlaintextAtLevelFromPoly(level int, poly *ring.Poly) *Plaintext {
 	if len(poly.Coeffs) < level+1 {
 		panic("cannot NewPlaintextAtLevelFromPoly: provided ring.Poly level is too small")
@@ -117,7 +124,7 @@ func NewCiphertextNTT(params Parameters, degree, level int) *Ciphertext {
 	return el
 }
 
-// NewCiphertextAtLevelFromPoly construct a new Ciphetext at a specific level
+// NewCiphertextAtLevelFromPoly constructs a new Ciphetext at a specific level
 // where the message is set to the passed poly. No checks are performed on poly and
 // the returned Ciphertext will share its backing array of coefficient.
 func NewCiphertextAtLevelFromPoly(level int, poly [2]*ring.Poly) *Ciphertext {
@@ -134,6 +141,13 @@ func NewCiphertextRandom(prng utils.PRNG, params Parameters, degree, level int) 
 	return
 }
 
+func NewCompressedCiphertext(params Parameters, degree, level int) *CompressedCiphertext {
+	el := new(CompressedCiphertext)
+	el.Value = ring.NewPoly(params.N(), level)
+	el.Seed = make([]byte, 64)
+	return el
+}
+
 // SetValue sets the input slice of polynomials as the value of the target element.
 func (el *Ciphertext) SetValue(value []*ring.Poly) {
 	el.Value = value
@@ -147,6 +161,10 @@ func (el *Ciphertext) Degree() int {
 // Level returns the level of the target element.
 func (el *Ciphertext) Level() int {
 	return len(el.Value[0].Coeffs) - 1
+}
+
+func (el *CompressedCiphertext) Level() int {
+	return len(el.Value.Coeffs) - 1
 }
 
 // Resize resizes the degree of the target element.
@@ -276,4 +294,47 @@ func PopulateElementRandom(prng utils.PRNG, params Parameters, el *Ciphertext) {
 	for i := range el.Value {
 		sampler.Read(el.Value[i])
 	}
+}
+
+func (ct_in *CompressedCiphertext) ToCiphertext(params Parameters) *Ciphertext {
+	ct_out := new(Ciphertext)
+	ct_out.Value = make([]*ring.Poly, 2)
+	ct_out.Value[0] = ct_in.Value.CopyNew()
+	ct_out.Value[1] = ring.NewPoly(ct_in.Value.N(), ct_in.Value.Level())
+
+	prng, _ := utils.NewKeyedPRNG(ct_in.Seed)
+	uniform_sampler := ringqp.NewUniformSampler(prng, *params.RingQP())
+	uniform_sampler.ReadLvl(ct_in.Level(), -1, ringqp.Poly{Q: ct_out.Value[1]})
+	if ct_in.Value.IsNTT {
+		ct_out.Value[1].IsNTT = true
+	} else {
+		params.ringQ.InvNTTLvl(ct_in.Level(), ct_out.Value[1], ct_out.Value[1])
+		ct_out.Value[1].IsNTT = false
+	}
+
+	return ct_out
+}
+
+func (ct *CiphertextQP) Decompress(params *Parameters) {
+	if !ct.Compressed {
+		panic("Input ct is not compressed.")
+	}
+
+	ringQP := params.RingQP()
+	levelQ, levelP := ct.Value[0].LevelQ(), ct.Value[0].LevelP()
+
+	ct.Value[1] = ringQP.NewPolyLvl(levelQ, levelP)
+
+	prng, _ := utils.NewKeyedPRNG(ct.Seed)
+	uniform_sampler := ringqp.NewUniformSampler(prng, *params.RingQP())
+	uniform_sampler.ReadLvl(levelQ, levelP, ct.Value[1])
+	if ct.Value[0].Q.IsNTT {
+		ct.Value[1].Q.IsNTT = true
+		ct.Value[1].P.IsNTT = true
+	} else {
+		ringQP.InvNTTLvl(levelQ, levelP, ct.Value[1], ct.Value[1])
+		ct.Value[1].Q.IsNTT = false
+		ct.Value[1].P.IsNTT = false
+	}
+	ct.Compressed = false
 }

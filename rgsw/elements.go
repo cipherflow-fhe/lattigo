@@ -5,8 +5,8 @@
 package rgsw
 
 import (
-	"github.com/tuneinsight/lattigo/v3/rlwe"
-	"github.com/tuneinsight/lattigo/v3/rlwe/ringqp"
+	"github.com/cipherflow-fhe/lattigo/rlwe"
+	"github.com/cipherflow-fhe/lattigo/rlwe/ringqp"
 )
 
 // Ciphertext is a generic type for RGSW ciphertext.

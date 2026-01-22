@@ -4,8 +4,8 @@ package bfv
 import (
 	"fmt"
 
-	"github.com/tuneinsight/lattigo/v3/ring"
-	"github.com/tuneinsight/lattigo/v3/utils"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 // GaloisGen is an integer of order N=2^d modulo M=2N and that spans Z_M with the integer -1.
@@ -36,9 +36,11 @@ const GaloisGen uint64 = ring.GaloisGen
 //
 type Encoder interface {
 	Encode(coeffs interface{}, pt *Plaintext)
+	EncodeCoeffs(coeffs interface{}, pt *Plaintext)
 	EncodeNew(coeffs interface{}, level int) (pt *Plaintext)
 	EncodeRingT(coeffs interface{}, pt *PlaintextRingT)
 	EncodeRingTNew(coeffs interface{}) (pt *PlaintextRingT)
+	EncodeCoeffsRingT(coeffs interface{}, pt *PlaintextRingT)
 	EncodeMul(coeffs interface{}, pt *PlaintextMul)
 	EncodeMulNew(coeffs interface{}, level int) (pt *PlaintextMul)
 
@@ -48,8 +50,10 @@ type Encoder interface {
 	MulToRingT(pt *PlaintextMul, ptRt *PlaintextRingT)
 
 	DecodeRingT(pt interface{}, ptRt *PlaintextRingT)
+	DecodeCoeffsUint(pt interface{}, coeffs []uint64)
 	DecodeUint(pt interface{}, coeffs []uint64)
 	DecodeInt(pt interface{}, coeffs []int64)
+	DecodeCoeffsUintNew(pt interface{}) (coeffs []uint64)
 	DecodeUintNew(pt interface{}) (coeffs []uint64)
 	DecodeIntNew(pt interface{}) (coeffs []int64)
 
@@ -114,6 +118,16 @@ func (ecd *encoder) Encode(values interface{}, pt *Plaintext) {
 	ecd.ScaleUp(ptRt, pt)
 }
 
+func (ecd *encoder) EncodeCoeffs(values interface{}, pt *Plaintext) {
+	ptRt := &PlaintextRingT{pt.Plaintext}
+
+	// Encodes the values in RingT
+	ecd.EncodeCoeffsRingT(values, ptRt)
+
+	// Scales by Q/t
+	ecd.ScaleUp(ptRt, pt)
+}
+
 // EncodeRingTNew encodes a slice of integers of type []uint64 or []int64 of size at most N into a newly allocated PlaintextRingT.
 func (ecd *encoder) EncodeRingTNew(values interface{}) (pt *PlaintextRingT) {
 	pt = NewPlaintextRingT(ecd.params)
@@ -162,6 +176,46 @@ func (ecd *encoder) EncodeRingT(values interface{}, ptOut *PlaintextRingT) {
 	}
 
 	ringT.InvNTT(ptOut.Value, ptOut.Value)
+}
+
+func (ecd *encoder) EncodeCoeffsRingT(values interface{}, ptOut *PlaintextRingT) {
+
+	if len(ptOut.Value.Coeffs[0]) != len(ecd.indexMatrix) {
+		panic("cannot EncodeRingT: invalid plaintext to receive encoding: number of coefficients does not match the ring degree")
+	}
+
+	pt := ptOut.Value.Coeffs[0]
+
+	ringT := ecd.params.RingT()
+
+	var valLen int
+	switch values := values.(type) {
+	case []uint64:
+		for i, c := range values {
+			pt[i] = c
+		}
+		ringT.Reduce(ptOut.Value, ptOut.Value)
+		valLen = len(values)
+	case []int64:
+
+		T := ringT.Modulus[0]
+		bredparamsT := ringT.BredParams[0]
+
+		var sign, abs uint64
+		for i, c := range values {
+			sign = uint64(c) >> 63
+			abs = ring.BRedAdd(uint64(c*((int64(sign)^1)-int64(sign))), T, bredparamsT)
+			pt[i] = sign*(T-abs) | (sign^1)*abs
+		}
+		valLen = len(values)
+	default:
+		panic("cannot EncodeRingT: coeffs must be either []uint64 or []int64")
+	}
+
+	for i := valLen; i < len(ecd.indexMatrix); i++ {
+		pt[i] = 0
+	}
+
 }
 
 // EncodeMulNew encodes a slice of integers of type []uint64 or []int64 of size at most N into a newly allocated PlaintextMul (optimized for ciphertext-plaintext multiplication).
@@ -253,6 +307,28 @@ func (ecd *encoder) DecodeUint(p interface{}, coeffs []uint64) {
 func (ecd *encoder) DecodeUintNew(p interface{}) (coeffs []uint64) {
 	coeffs = make([]uint64, ecd.params.RingQ().N)
 	ecd.DecodeUint(p, coeffs)
+	return
+}
+
+func (ecd *encoder) DecodeCoeffsUint(p interface{}, coeffs []uint64) {
+
+	var ptRt *PlaintextRingT
+	var isInRingT bool
+	if ptRt, isInRingT = p.(*PlaintextRingT); !isInRingT {
+		ecd.DecodeRingT(p, ecd.tmpPtRt)
+		ptRt = ecd.tmpPtRt
+	}
+
+	ecd.tmpPoly = ptRt.Value
+
+	for i := 0; i < ecd.params.RingQ().N; i++ {
+		coeffs[i] = ecd.tmpPoly.Coeffs[0][i]
+	}
+}
+
+func (ecd *encoder) DecodeCoeffsUintNew(p interface{}) (coeffs []uint64) {
+	coeffs = make([]uint64, ecd.params.RingQ().N)
+	ecd.DecodeCoeffsUint(p, coeffs)
 	return
 }
 

@@ -1,7 +1,7 @@
 package ring
 
 import (
-	"github.com/tuneinsight/lattigo/v3/utils"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 const precision = uint64(56)
