@@ -374,9 +374,15 @@ func SerializeCkksBtpContextAdvanced(context_handle uint64, raw_data **byte, len
 		rlwe.RotationKeySetToBytes(context.evk.Rtks, &context.parameter.Parameters, writer)
 	}
 
+	paramsSparse, _ := rlwe.NewParametersFromLiteral(rlwe.ParametersLiteral{
+		LogN: context.parameter.Parameters.LogN(),
+		Q:    context.parameter.Parameters.Q()[:1],
+		P:    context.parameter.Parameters.P(),
+	})
+
 	binary.Write(writer, binary.LittleEndian, context.evk.SwkDtS != nil)
 	if context.evk.SwkDtS != nil {
-		rlwe.GadgetCiphertextToBytes(&context.evk.SwkDtS.GadgetCiphertext, &context.parameter.Parameters, writer)
+		rlwe.GadgetCiphertextToBytes(&context.evk.SwkDtS.GadgetCiphertext, &paramsSparse, writer)
 	}
 
 	binary.Write(writer, binary.LittleEndian, context.evk.SwkStD != nil)
