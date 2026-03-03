@@ -308,8 +308,8 @@ extern void SetCkksBtpContextSwitchkeyStd(GoUint64 context_handle, GoUint64 swit
 extern void CreateCkksBtpContextBootstrapper(GoUint64 context_handle);
 extern GoUint64 SerializeCkksBtpContextAdvanced(GoUint64 context_handle, GoUint8** raw_data, uint64_t* length);
 extern GoUint64 DeserializeCkksBtpContextAdvanced(GoUint8* raw_data, GoUint64 length);
-extern GoUint64 ImportBfvCiphertext(GoUint64 parameter_handle, CCiphertext* c_ciphertext);
-extern GoUint64 ImportCkksCiphertext(GoUint64 parameter_handle, CCiphertext* c_ciphertext);
+extern void ImportBfvCiphertext(GoUint64 dest_handle, CCiphertext* c_ciphertext);
+extern void ImportCkksCiphertext(GoUint64 dest_handle, CCiphertext* c_ciphertext);
 extern void ExportBfvPlaintextRingt(GoUint64 plaintext_ringt_handle, CPlaintext* c_plaintext);
 extern void ExportCkksPlaintextRingt(GoUint64 plaintext_ringt_handle, CPlaintext* c_plaintext);
 extern void ExportBfvPlaintextMul(GoUint64 plaintext_mul_handle, CPlaintext* c_plaintext);

@@ -16,10 +16,14 @@ import (
 
 func import_component(src *C.CComponent, dest *[]uint64) {
 	N := int(src.n)
-	data_slice := unsafe.Slice(src.data, N)
-	for i := 0; i < N; i++ {
-		(*dest)[i] = uint64(data_slice[i])
-	}
+	// Zero-copy: dest slice points directly into C memory (src.data).
+	// Commented out: risky if C memory is freed before Go finishes using it.
+	// *dest = unsafe.Slice((*uint64)(unsafe.Pointer(src.data)), N)
+
+	// Copy: safe for all backends (GPU async D2H, FPGA pvo lifetime).
+	// Requires *dest to already have length N (guaranteed by new_ciphertext).
+	src_slice := unsafe.Slice((*uint64)(unsafe.Pointer(src.data)), N)
+	copy(*dest, src_slice)
 }
 
 func export_component(src *[]uint64, dest *C.CComponent) {
@@ -110,33 +114,23 @@ func export_galois_key(src *rlwe.RotationKeySet, dest *C.CGaloisKey, level int) 
 }
 
 //export ImportBfvCiphertext
-func ImportBfvCiphertext(parameter_handle uint64, c_ciphertext *C.CCiphertext) uint64 {
-	param := get_object[bfv.Parameters](parameter_handle)
-	level := int(c_ciphertext.level)
+func ImportBfvCiphertext(dest_handle uint64, c_ciphertext *C.CCiphertext) {
+	dest := get_object[bfv.Ciphertext](dest_handle)
 	degree := int(c_ciphertext.degree)
-
 	poly_slice := unsafe.Slice(c_ciphertext.polys, degree+1)
-	ciphertext := bfv.NewCiphertextLvl(*param, degree, level)
 	for i := 0; i < degree+1; i++ {
-		import_polynomial(&poly_slice[i], ciphertext.Value[i])
+		import_polynomial(&poly_slice[i], dest.Value[i])
 	}
-	id := insert_object(ciphertext)
-	return id
 }
 
 //export ImportCkksCiphertext
-func ImportCkksCiphertext(parameter_handle uint64, c_ciphertext *C.CCiphertext) uint64 {
-	param := get_object[ckks.Parameters](parameter_handle)
-	level := int(c_ciphertext.level)
+func ImportCkksCiphertext(dest_handle uint64, c_ciphertext *C.CCiphertext) {
+	dest := get_object[ckks.Ciphertext](dest_handle)
 	degree := int(c_ciphertext.degree)
-
 	poly_slice := unsafe.Slice(c_ciphertext.polys, degree+1)
-	ciphertext := ckks.NewCiphertext(*param, degree, level, param.DefaultScale())
 	for i := 0; i < degree+1; i++ {
-		import_polynomial(&poly_slice[i], ciphertext.Value[i])
+		import_polynomial(&poly_slice[i], dest.Value[i])
 	}
-	id := insert_object(ciphertext)
-	return id
 }
 
 //export ExportBfvPlaintextRingt
