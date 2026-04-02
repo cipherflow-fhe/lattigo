@@ -1063,7 +1063,11 @@ func SerializeBfvContext(context_handle uint64, raw_data **byte, length *C.uint6
 	var object_data_slice []byte
 
 	param_data, _ := context.parameter.MarshalBinary()
-	data_slice = append(data_slice, byte(len(param_data)))
+	{
+		paramLenBuf := make([]byte, 4)
+		binary.BigEndian.PutUint32(paramLenBuf, uint32(len(param_data)))
+		data_slice = append(data_slice, paramLenBuf...)
+	}
 	data_slice = append(data_slice, param_data...)
 
 	data_bit_length := serialize_data_bit_length_from_bfv_param(context.parameter)
@@ -1132,8 +1136,8 @@ func DeserializeBfvContext(raw_data *byte, length uint64) uint64 {
 	var object_length int
 
 	param := new(bfv.Parameters)
-	param_size := int(data_slice[pt])
-	pt += 1
+	param_size := int(binary.BigEndian.Uint32(data_slice[pt : pt+4]))
+	pt += 4
 	param.UnmarshalBinary(data_slice[pt : pt+param_size])
 	pt += param_size
 	context.parameter = param
@@ -1299,7 +1303,11 @@ func SerializeBfvContextAdvanced(context_handle uint64, raw_data **byte, length 
 	writer := new(bytes.Buffer)
 
 	param_data, _ := context.parameter.MarshalBinary()
-	writer.WriteByte(byte(len(param_data)))
+	{
+		paramLenBuf := make([]byte, 4)
+		binary.BigEndian.PutUint32(paramLenBuf, uint32(len(param_data)))
+		writer.Write(paramLenBuf)
+	}
 	writer.Write(param_data)
 
 	rlwe_context_to_bytes(&context.RlweContext, &context.parameter.Parameters, writer)
@@ -1319,7 +1327,9 @@ func DeserializeBfvContextAdvanced(raw_data *byte, length C.uint64_t) uint64 {
 	reader := bytes.NewReader(data_slice)
 
 	param := new(bfv.Parameters)
-	param_size, _ := reader.ReadByte()
+	var paramLenBuf [4]byte
+	reader.Read(paramLenBuf[:])
+	param_size := int(binary.BigEndian.Uint32(paramLenBuf[:]))
 	param_data := make([]byte, param_size)
 	reader.Read(param_data)
 	param.UnmarshalBinary(param_data)
@@ -1345,7 +1355,11 @@ func SerializeCkksContext(context_handle uint64, raw_data **byte, length *C.uint
 	var object_data_slice []byte
 
 	param_data, _ := context.parameter.MarshalBinary()
-	data_slice = append(data_slice, byte(len(param_data)))
+	{
+		paramLenBuf := make([]byte, 4)
+		binary.BigEndian.PutUint32(paramLenBuf, uint32(len(param_data)))
+		data_slice = append(data_slice, paramLenBuf...)
+	}
 	data_slice = append(data_slice, param_data...)
 
 	data_bit_length := serialize_data_bit_length_from_ckks_param(context.parameter)
@@ -1415,7 +1429,11 @@ func SerializeCkksSecretKey(context_handle uint64, data_bit_length int, raw_data
 	var object_data_slice []byte
 
 	param_data, _ := context.parameter.MarshalBinary()
-	data_slice = append(data_slice, byte(len(param_data)))
+	{
+		paramLenBuf := make([]byte, 4)
+		binary.BigEndian.PutUint32(paramLenBuf, uint32(len(param_data)))
+		data_slice = append(data_slice, paramLenBuf...)
+	}
 	data_slice = append(data_slice, param_data...)
 
 	if context.sk != nil {
@@ -1447,7 +1465,11 @@ func SerializeCkksPublicKey(context_handle uint64, data_bit_length int, raw_data
 	var object_data_slice []byte
 
 	param_data, _ := context.parameter.MarshalBinary()
-	data_slice = append(data_slice, byte(len(param_data)))
+	{
+		paramLenBuf := make([]byte, 4)
+		binary.BigEndian.PutUint32(paramLenBuf, uint32(len(param_data)))
+		data_slice = append(data_slice, paramLenBuf...)
+	}
 	data_slice = append(data_slice, param_data...)
 
 	if context.rlk != nil {
@@ -1477,8 +1499,8 @@ func DeserializeCkksContext(raw_data *byte, length C.uint64_t) uint64 {
 	var object_length int
 
 	param := new(ckks.Parameters)
-	param_size := int(data_slice[pt])
-	pt += 1
+	param_size := int(binary.BigEndian.Uint32(data_slice[pt : pt+4]))
+	pt += 4
 	param.UnmarshalBinary(data_slice[pt : pt+param_size])
 	pt += param_size
 	context.parameter = param
@@ -1566,8 +1588,8 @@ func DeserializeCkksSecretKey(raw_data *byte, length C.uint64_t, data_bit_length
 	var object_length int
 
 	param := new(ckks.Parameters)
-	param_size := int(data_slice[pt])
-	pt += 1
+	param_size := int(binary.BigEndian.Uint32(data_slice[pt : pt+4]))
+	pt += 4
 	param.UnmarshalBinary(data_slice[pt : pt+param_size])
 	pt += param_size
 	context.parameter = param
@@ -1614,8 +1636,8 @@ func DeserializeCkksPublicKey(raw_data *byte, length C.uint64_t, data_bit_length
 	var object_length int
 
 	param := new(ckks.Parameters)
-	param_size := int(data_slice[pt])
-	pt += 1
+	param_size := int(binary.BigEndian.Uint32(data_slice[pt : pt+4]))
+	pt += 4
 	param.UnmarshalBinary(data_slice[pt : pt+param_size])
 	pt += param_size
 	context.parameter = param
@@ -1661,7 +1683,11 @@ func SerializeCkksContextAdvanced(context_handle uint64, raw_data **byte, length
 	writer := new(bytes.Buffer)
 
 	param_data, _ := context.parameter.MarshalBinary()
-	writer.WriteByte(byte(len(param_data)))
+	{
+		paramLenBuf := make([]byte, 4)
+		binary.BigEndian.PutUint32(paramLenBuf, uint32(len(param_data)))
+		writer.Write(paramLenBuf)
+	}
 	writer.Write(param_data)
 
 	rlwe_context_to_bytes(&context.RlweContext, &context.parameter.Parameters, writer)
@@ -1681,7 +1707,9 @@ func DeserializeCkksContextAdvanced(raw_data *byte, length C.uint64_t) uint64 {
 	reader := bytes.NewReader(data_slice)
 
 	param := new(ckks.Parameters)
-	param_size, _ := reader.ReadByte()
+	var paramLenBuf [4]byte
+	reader.Read(paramLenBuf[:])
+	param_size := int(binary.BigEndian.Uint32(paramLenBuf[:]))
 	param_data := make([]byte, param_size)
 	reader.Read(param_data)
 	param.UnmarshalBinary(param_data)
