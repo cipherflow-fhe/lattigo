@@ -106,14 +106,24 @@ func NewHomomorphicEncodingMatrixFromLiteral(mParams EncodingMatrixLiteral, enco
 	// CoeffsToSlots vectors
 	matrices := make([]ckks.LinearTransform, len(ctsLevels))
 	pVecDFT := mParams.computeDFTMatrices()
+
 	cnt := 0
 	trueDepth := mParams.Depth(true)
+	jobs := make([]func(), 0, len(ctsLevels))
 	for i := range mParams.ScalingFactor {
 		for j := range mParams.ScalingFactor[trueDepth-i-1] {
-			matrices[cnt] = ckks.GenLinearTransformBSGS(encoder, pVecDFT[cnt], ctsLevels[cnt], mParams.ScalingFactor[trueDepth-i-1][j], mParams.BSGSRatio, logdSlots)
+			idx := cnt
+			pVec := pVecDFT[cnt]
+			level := ctsLevels[cnt]
+			scalingFactor := mParams.ScalingFactor[trueDepth-i-1][j]
+			localEncoder := encoder.ShallowCopy()
+			jobs = append(jobs, func() {
+				matrices[idx] = ckks.GenLinearTransformBSGS(localEncoder, pVec, level, scalingFactor, mParams.BSGSRatio, logdSlots)
+			})
 			cnt++
 		}
 	}
+	utils.WorkerPool(0, jobs)
 
 	return EncodingMatrix{EncodingMatrixLiteral: mParams, matrices: matrices}
 }

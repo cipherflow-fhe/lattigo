@@ -12,6 +12,7 @@ import (
 	"github.com/cipherflow-fhe/lattigo/ckks"
 	"github.com/cipherflow-fhe/lattigo/ckks/bootstrapping"
 	"github.com/cipherflow-fhe/lattigo/rlwe"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 type BtpParameterSet struct {
@@ -80,9 +81,25 @@ func CreateRandomCkksBtpContext(parameter_handle uint64) uint64 {
 	context.kgen = ckks.NewKeyGenerator(*context.parameter)
 	context.sk, context.pk = context.kgen.GenKeyPair()
 
-	// Generate bootstrap evaluation keys first
+	// GenEvaluationKeys (key material) and NewBootstrapperBase (encoding matrices/EvalMod poly)
+	// are independent — run them concurrently.
+	var evk bootstrapping.EvaluationKeys
+	var btpBase *bootstrapping.BootstrapperBase
+	var btpBaseErr error
+	utils.WorkerPool(0, []func(){
+		func() {
+			evk = bootstrapping.GenEvaluationKeys(*context.btp_parameter, *context.parameter, context.sk)
+		},
+		func() {
+			btpBase, btpBaseErr = bootstrapping.NewBootstrapperBase(*context.parameter, *context.btp_parameter)
+		},
+	})
+	if btpBaseErr != nil {
+		panic(btpBaseErr)
+	}
+
 	context.evk = new(bootstrapping.EvaluationKeys)
-	*context.evk = bootstrapping.GenEvaluationKeys(*context.btp_parameter, *context.parameter, context.sk)
+	*context.evk = evk
 
 	// Point rlk and gk to evk's keys (shared references, not copies)
 	context.rlk = context.evk.Rlk
@@ -94,8 +111,9 @@ func CreateRandomCkksBtpContext(parameter_handle uint64) uint64 {
 	context.evaluator = ckks.NewEvaluator(*context.parameter, rlwe.EvaluationKey{
 		Rlk: context.rlk,
 	})
+
 	var err error
-	context.bootstrapper, err = bootstrapping.NewBootstrapper(*context.parameter, *context.btp_parameter, *context.evk)
+	context.bootstrapper, err = bootstrapping.NewBootstrapperFromBase(*context.parameter, *context.evk, btpBase)
 	if err != nil {
 		panic(err)
 	}
@@ -360,6 +378,18 @@ func SerializeCkksBtpContextAdvanced(context_handle uint64, raw_data **byte, len
 	var data_slice []byte
 	writer := new(bytes.Buffer)
 
+	// Pre-allocate to avoid repeated realloc during writes.
+	// Rtks dominates: nKeys * decomp * (levelQ+levelP) * N * bitLen/8 bytes for c0 only (c1 is stored as seed).
+	if context.evk != nil && context.evk.Rtks != nil {
+		nKeys := len(context.evk.Rtks.Keys)
+		levelQ := context.parameter.QCount()
+		levelP := context.parameter.PCount()
+		decomp := context.parameter.DecompRNS(levelQ-1, levelP-1)
+		// Each coefficient is ~60 bits on average; use 8 bytes as upper bound per uint64.
+		bytesPerKey := context.parameter.N() * (levelQ + levelP) * decomp * 8
+		writer.Grow(nKeys * bytesPerKey)
+	}
+
 	param_data, _ := context.parameter.MarshalBinary()
 	binary.Write(writer, binary.LittleEndian, uint32(len(param_data)))
 	writer.Write(param_data)
@@ -438,7 +468,6 @@ func DeserializeCkksBtpContextAdvanced(raw_data *byte, length uint64) uint64 {
 	if exist {
 		pk := rlwe.BytesToCiphertextQP(reader)
 		context.pk = &pk
-		context.pk.Decompress(&param.Parameters)
 	} else {
 		context.pk = nil
 	}
@@ -456,10 +485,6 @@ func DeserializeCkksBtpContextAdvanced(raw_data *byte, length uint64) uint64 {
 	if exist {
 		btp_rlk := rlwe.BytesToRelinearizationKey(reader)
 		context.evk.Rlk = &btp_rlk
-
-		for _, swk := range context.evk.Rlk.Keys {
-			swk.Decompress(&context.parameter.Parameters)
-		}
 	} else {
 		context.evk.Rlk = nil
 	}
@@ -468,10 +493,6 @@ func DeserializeCkksBtpContextAdvanced(raw_data *byte, length uint64) uint64 {
 	if exist {
 		btp_gk := rlwe.BytesToRotationKeySet(reader)
 		context.evk.Rtks = &btp_gk
-
-		for _, swk := range context.evk.Rtks.Keys {
-			swk.Decompress(&context.parameter.Parameters)
-		}
 	} else {
 		context.evk.Rtks = nil
 	}
@@ -480,8 +501,6 @@ func DeserializeCkksBtpContextAdvanced(raw_data *byte, length uint64) uint64 {
 	if exist {
 		context.evk.SwkDtS = new(rlwe.SwitchingKey)
 		context.evk.SwkDtS.GadgetCiphertext = rlwe.BytesToGadgetCiphertext(reader)
-
-		context.evk.SwkDtS.Decompress(&context.parameter.Parameters)
 	} else {
 		context.evk.SwkDtS = nil
 	}
@@ -490,11 +509,34 @@ func DeserializeCkksBtpContextAdvanced(raw_data *byte, length uint64) uint64 {
 	if exist {
 		context.evk.SwkStD = new(rlwe.SwitchingKey)
 		context.evk.SwkStD.GadgetCiphertext = rlwe.BytesToGadgetCiphertext(reader)
-
-		context.evk.SwkStD.Decompress(&context.parameter.Parameters)
 	} else {
 		context.evk.SwkStD = nil
 	}
+
+	// Decompress all keys in parallel — CPU-bound (NTT + BLAKE2b), each on independent memory.
+	var jobs []func()
+	if context.pk != nil {
+		jobs = append(jobs, func() { context.pk.Decompress(&param.Parameters) })
+	}
+	if context.evk.Rlk != nil {
+		for _, swk := range context.evk.Rlk.Keys {
+			swk := swk
+			jobs = append(jobs, func() { swk.Decompress(&context.parameter.Parameters) })
+		}
+	}
+	if context.evk.Rtks != nil {
+		for _, swk := range context.evk.Rtks.Keys {
+			swk := swk
+			jobs = append(jobs, func() { swk.Decompress(&context.parameter.Parameters) })
+		}
+	}
+	if context.evk.SwkDtS != nil {
+		jobs = append(jobs, func() { context.evk.SwkDtS.Decompress(&context.parameter.Parameters) })
+	}
+	if context.evk.SwkStD != nil {
+		jobs = append(jobs, func() { context.evk.SwkStD.Decompress(&context.parameter.Parameters) })
+	}
+	utils.WorkerPool(0, jobs)
 
 	context.rlk = context.evk.Rlk
 	context.gk = context.evk.Rtks
