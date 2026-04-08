@@ -13,10 +13,10 @@ import (
 // the polynomial approximation, and the keys for the bootstrapping.
 type Bootstrapper struct {
 	advanced.Evaluator
-	*bootstrapperBase
+	*BootstrapperBase
 }
 
-type bootstrapperBase struct {
+type BootstrapperBase struct {
 	Parameters
 	params ckks.Parameters
 
@@ -41,38 +41,49 @@ type EvaluationKeys struct {
 	SwkStD *rlwe.SwitchingKey
 }
 
-// NewBootstrapper creates a new Bootstrapper.
-func NewBootstrapper(params ckks.Parameters, btpParams Parameters, btpKeys EvaluationKeys) (btp *Bootstrapper, err error) {
-
+// NewBootstrapperBase precomputes the parameter-only portion of a Bootstrapper
+// (encoding matrices, EvalMod polynomial) without requiring any EvaluationKeys.
+// The result can be passed to NewBootstrapperFromBase to complete initialization,
+// allowing GenEvaluationKeys and NewBootstrapperBase to run concurrently.
+func NewBootstrapperBase(params ckks.Parameters, btpParams Parameters) (*BootstrapperBase, error) {
 	if btpParams.EvalModParameters.SineType == advanced.Sin && btpParams.EvalModParameters.DoubleAngle != 0 {
 		return nil, fmt.Errorf("cannot use double angle formul for SineType = Sin -> must use SineType = Cos")
 	}
-
 	if btpParams.EvalModParameters.SineType == advanced.Cos1 && btpParams.EvalModParameters.SineDeg < 2*(btpParams.EvalModParameters.K-1) {
 		return nil, fmt.Errorf("SineType 'advanced.Cos1' uses a minimum degree of 2*(K-1) but EvalMod degree is smaller")
 	}
-
 	if btpParams.CoeffsToSlotsParameters.LevelStart-btpParams.CoeffsToSlotsParameters.Depth(true) != btpParams.EvalModParameters.LevelStart {
 		return nil, fmt.Errorf("starting level and depth of CoeffsToSlotsParameters inconsistent starting level of SineEvalParameters")
 	}
-
 	if btpParams.EvalModParameters.LevelStart-btpParams.EvalModParameters.Depth() != btpParams.SlotsToCoeffsParameters.LevelStart {
 		return nil, fmt.Errorf("starting level and depth of SineEvalParameters inconsistent starting level of CoeffsToSlotsParameters")
 	}
+	return newBootstrapperBase(params, btpParams), nil
+}
 
+// NewBootstrapperFromBase completes Bootstrapper initialization given a pre-computed
+// BootstrapperBase (from NewBootstrapperBase) and the EvaluationKeys.
+func NewBootstrapperFromBase(params ckks.Parameters, btpKeys EvaluationKeys, base *BootstrapperBase) (btp *Bootstrapper, err error) {
 	btp = new(Bootstrapper)
-	btp.bootstrapperBase = newBootstrapperBase(params, btpParams, btpKeys)
+	btp.BootstrapperBase = base
 
-	if err = btp.bootstrapperBase.CheckKeys(btpKeys); err != nil {
+	if err = btp.BootstrapperBase.CheckKeys(btpKeys); err != nil {
 		return nil, fmt.Errorf("invalid bootstrapping key: %w", err)
 	}
 
-	btp.bootstrapperBase.swkDtS = btpKeys.SwkDtS
-	btp.bootstrapperBase.swkStD = btpKeys.SwkStD
-
+	btp.BootstrapperBase.swkDtS = btpKeys.SwkDtS
+	btp.BootstrapperBase.swkStD = btpKeys.SwkStD
 	btp.Evaluator = advanced.NewEvaluator(params, btpKeys.EvaluationKey)
-
 	return
+}
+
+// NewBootstrapper creates a new Bootstrapper.
+func NewBootstrapper(params ckks.Parameters, btpParams Parameters, btpKeys EvaluationKeys) (btp *Bootstrapper, err error) {
+	base, err := NewBootstrapperBase(params, btpParams)
+	if err != nil {
+		return nil, err
+	}
+	return NewBootstrapperFromBase(params, btpKeys, base)
 }
 
 // GenEvaluationKeys generates the bootstrapping EvaluationKeys, which contain:
@@ -87,7 +98,6 @@ func GenEvaluationKeys(btpParams Parameters, ckksParams ckks.Parameters, sk *rlw
 	rlk := kgen.GenRelinearizationKey(sk, 1)
 	rotkeys := kgen.GenRotationKeysForRotations(rotations, true, sk)
 	swkDtS, swkStD := btpParams.GenEncapsulationSwitchingKeys(ckksParams, sk)
-
 	return EvaluationKeys{
 		EvaluationKey: rlwe.EvaluationKey{
 			Rlk:  rlk,
@@ -126,12 +136,12 @@ func (p *Parameters) GenEncapsulationSwitchingKeys(params ckks.Parameters, skDen
 func (btp *Bootstrapper) ShallowCopy() *Bootstrapper {
 	return &Bootstrapper{
 		Evaluator:        btp.Evaluator.ShallowCopy(),
-		bootstrapperBase: btp.bootstrapperBase,
+		BootstrapperBase: btp.BootstrapperBase,
 	}
 }
 
 // CheckKeys checks if all the necessary keys are present in the instantiated Bootstrapper
-func (bb *bootstrapperBase) CheckKeys(btpKeys EvaluationKeys) (err error) {
+func (bb *BootstrapperBase) CheckKeys(btpKeys EvaluationKeys) (err error) {
 
 	if btpKeys.Rlk == nil {
 		return fmt.Errorf("relinearization key is nil")
@@ -174,8 +184,8 @@ func (bb *bootstrapperBase) CheckKeys(btpKeys EvaluationKeys) (err error) {
 	return nil
 }
 
-func newBootstrapperBase(params ckks.Parameters, btpParams Parameters, btpKey EvaluationKeys) (bb *bootstrapperBase) {
-	bb = new(bootstrapperBase)
+func newBootstrapperBase(params ckks.Parameters, btpParams Parameters) (bb *BootstrapperBase) {
+	bb = new(BootstrapperBase)
 	bb.params = params
 	bb.Parameters = btpParams
 

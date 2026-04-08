@@ -149,9 +149,20 @@ func (keygen *keyGenerator) GenRelinearizationKeyLvl(sk *SecretKey, maxDegree in
 // See also GenRotationKeysForRotations.
 func (keygen *keyGenerator) GenRotationKeys(galEls []uint64, sk *SecretKey) (rks *RotationKeySet) {
 	rks = NewRotationKeySet(keygen.params, galEls)
-	for _, galEl := range galEls {
-		keygen.genrotKey(sk.Value, keygen.params.InverseGaloisElement(galEl), rks.Keys[galEl])
+
+	// Build one job per unique galois element (rks.Keys is already deduplicated).
+	jobs := make([]func(), 0, len(rks.Keys))
+	for galEl := range rks.Keys {
+		galEl := galEl // capture
+		swk := rks.Keys[galEl]
+		jobs = append(jobs, func() {
+			localKgen := &keyGenerator{
+				skEncryptor: newSkEncryptor(keygen.params, NewSecretKey(keygen.params)),
+			}
+			localKgen.genrotKey(sk.Value, localKgen.params.InverseGaloisElement(galEl), swk)
+		})
 	}
+	utils.WorkerPool(0, jobs)
 	return rks
 }
 
