@@ -219,7 +219,9 @@ extern GoUint64 BfvEncodeCoeffsMul(GoUint64 context_handle, uint64_t* message_ar
 extern GoUint64 CkksEncode(GoUint64 context_handle, double* message_array, GoInt mg_len, GoInt level, GoFloat64 scale);
 extern GoUint64 CkksEncodeComplex(GoUint64 context_handle, double* message_array, GoInt mg_len, GoInt level, GoFloat64 scale);
 extern GoUint64 CkksEncodeRingt(GoUint64 context_handle, double* message_array, GoInt mg_len, GoFloat64 scale);
+extern GoUint64 CkksEncodeRingtComplex(GoUint64 context_handle, double* message_array, GoInt mg_len, GoFloat64 scale);
 extern GoUint64 CkksEncodeMul(GoUint64 context_handle, double* message_array, GoInt mg_len, GoInt level, GoFloat64 scale);
+extern GoUint64 CkksEncodeMulComplex(GoUint64 context_handle, double* message_array, GoInt mg_len, GoInt level, GoFloat64 scale);
 extern GoUint64 CkksEncodeCoeffs(GoUint64 context_handle, double* message_array, GoInt mg_len, GoInt level, GoFloat64 scale);
 extern GoUint64 CkksEncodeCoeffsRingt(GoUint64 context_handle, double* message_array, GoInt mg_len, GoFloat64 scale);
 extern GoUint64 CkksEncodeCoeffsMul(GoUint64 context_handle, double* message_array, GoInt mg_len, GoInt level, GoFloat64 scale);

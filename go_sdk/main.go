@@ -2066,6 +2066,22 @@ func CkksEncodeRingt(context_handle uint64, message_array *C.double, mg_len int,
 	return id
 }
 
+//export CkksEncodeRingtComplex
+func CkksEncodeRingtComplex(context_handle uint64, message_array *C.double, mg_len int, scale float64) uint64 {
+	context := get_ckks_context(context_handle)
+
+	slice := unsafe.Slice((*float64)(message_array), mg_len*2)
+	message := make([]complex128, mg_len)
+	for i := 0; i < mg_len; i++ {
+		message[i] = complex(slice[i*2], slice[i*2+1])
+	}
+	plaintext := ckks.NewPlaintextRingT(*context.parameter, scale)
+	context.encoder.EncodeRingT(message, plaintext, context.parameter.LogN()-1)
+
+	id := insert_object(plaintext)
+	return id
+}
+
 //export CkksEncodeMul
 func CkksEncodeMul(context_handle uint64, message_array *C.double, mg_len int, level int, scale float64) uint64 {
 	context := get_ckks_context(context_handle)
@@ -2073,6 +2089,25 @@ func CkksEncodeMul(context_handle uint64, message_array *C.double, mg_len int, l
 
 	slice := unsafe.Slice((*float64)(message_array), mg_len)
 	plaintext := context.encoder.EncodeNew(slice, level, scale, context.parameter.LogSlots())
+	plaintext_mul := ckks.NewPlaintextMul(*context.parameter, level, scale)
+	ringq.MForm(plaintext.Value, plaintext_mul.Value)
+
+	id := insert_object(plaintext_mul)
+	return id
+
+}
+
+//export CkksEncodeMulComplex
+func CkksEncodeMulComplex(context_handle uint64, message_array *C.double, mg_len int, level int, scale float64) uint64 {
+	context := get_ckks_context(context_handle)
+	ringq := context.parameter.RingQ()
+
+	slice := unsafe.Slice((*float64)(message_array), mg_len*2)
+	message := make([]complex128, mg_len)
+	for i := 0; i < mg_len; i++ {
+		message[i] = complex(slice[i*2], slice[i*2+1])
+	}
+	plaintext := context.encoder.EncodeNew(message, level, scale, context.parameter.LogSlots())
 	plaintext_mul := ckks.NewPlaintextMul(*context.parameter, level, scale)
 	ringq.MForm(plaintext.Value, plaintext_mul.Value)
 
@@ -2099,7 +2134,7 @@ func CkksEncodeCoeffsRingt(context_handle uint64, message_array *C.double, mg_le
 
 	slice := unsafe.Slice((*float64)(message_array), mg_len)
 	plaintext := ckks.NewPlaintextRingT(*context.parameter, scale)
-	context.encoder.EncodeCoeffsRingT(slice, plaintext, context.parameter.LogN()-1)
+	context.encoder.EncodeCoeffsRingT(slice, plaintext)
 
 	id := insert_object(plaintext)
 	return id
