@@ -50,7 +50,6 @@ type Encoder interface {
 	// Slots Encoding
 	Encode(values interface{}, plaintext *Plaintext, logSlots int)
 	EncodeRingT(values interface{}, plaintext *PlaintextRingT, logSlots int)
-	EncodeCoeffsRingT(values interface{}, plaintext *PlaintextRingT, logSlots int)
 	EncodeNew(values interface{}, level int, scale float64, logSlots int) (plaintext *Plaintext)
 	EncodeSlots(values interface{}, plaintext *Plaintext, logSlots int)
 	EncodeSlotsNew(values interface{}, level int, scale float64, logSlots int) (plaintext *Plaintext)
@@ -60,6 +59,7 @@ type Encoder interface {
 	DecodeSlotsPublic(plaintext *Plaintext, logSlots int, sigma float64) []complex128
 
 	// Coeffs Encoding
+	EncodeCoeffsRingT(values []float64, plaintext *PlaintextRingT, logSlots int)
 	EncodeCoeffs(values []float64, plaintext *Plaintext)
 	EncodeCoeffsNew(values []float64, level int, scale float64) (plaintext *Plaintext)
 	DecodeCoeffs(plaintext *Plaintext) (res []float64)
@@ -256,7 +256,7 @@ func (ecd *encoderComplex128) EncodeRingT(values interface{}, plaintext *Plainte
 	ecd.EmbedRingT(values, logSlots, plaintext.Scale, false, true, plaintext.Value)
 }
 
-func (ecd *encoderComplex128) EncodeCoeffsRingT(values interface{}, plaintext *PlaintextRingT, logSlots int) {
+func (ecd *encoderComplex128) EncodeCoeffsRingT(values []float64, plaintext *PlaintextRingT, logSlots int) {
 	ecd.EmbedRingT(values, logSlots, plaintext.Scale, false, false, plaintext.Value)
 }
 
