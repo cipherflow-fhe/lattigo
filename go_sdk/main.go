@@ -2134,7 +2134,7 @@ func CkksEncodeCoeffsRingt(context_handle uint64, message_array *C.double, mg_le
 
 	slice := unsafe.Slice((*float64)(message_array), mg_len)
 	plaintext := ckks.NewPlaintextRingT(*context.parameter, scale)
-	context.encoder.EncodeCoeffsRingT(slice, plaintext, context.parameter.LogN()-1)
+	context.encoder.EncodeCoeffsRingT(slice, plaintext)
 
 	id := insert_object(plaintext)
 	return id

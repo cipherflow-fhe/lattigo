@@ -59,7 +59,7 @@ type Encoder interface {
 	DecodeSlotsPublic(plaintext *Plaintext, logSlots int, sigma float64) []complex128
 
 	// Coeffs Encoding
-	EncodeCoeffsRingT(values []float64, plaintext *PlaintextRingT, logSlots int)
+	EncodeCoeffsRingT(values []float64, plaintext *PlaintextRingT)
 	EncodeCoeffs(values []float64, plaintext *Plaintext)
 	EncodeCoeffsNew(values []float64, level int, scale float64) (plaintext *Plaintext)
 	DecodeCoeffs(plaintext *Plaintext) (res []float64)
@@ -70,7 +70,7 @@ type Encoder interface {
 
 	// Utility
 	Embed(values interface{}, logSlots int, scale float64, montgomery bool, polyOut interface{})
-	EmbedRingT(values interface{}, logSlots int, scale float64, montgomery bool, ifft bool, polyOut interface{})
+	EmbedRingT(values interface{}, logSlots int, scale float64, montgomery bool, polyOut interface{})
 	GetErrSTDCoeffDomain(valuesWant, valuesHave []complex128, scale float64) (std float64)
 	GetErrSTDSlotDomain(valuesWant, valuesHave []complex128, scale float64) (std float64)
 	ShallowCopy() Encoder
@@ -253,11 +253,7 @@ func (ecd *encoderComplex128) Encode(values interface{}, plaintext *Plaintext, l
 }
 
 func (ecd *encoderComplex128) EncodeRingT(values interface{}, plaintext *PlaintextRingT, logSlots int) {
-	ecd.EmbedRingT(values, logSlots, plaintext.Scale, false, true, plaintext.Value)
-}
-
-func (ecd *encoderComplex128) EncodeCoeffsRingT(values []float64, plaintext *PlaintextRingT, logSlots int) {
-	ecd.EmbedRingT(values, logSlots, plaintext.Scale, false, false, plaintext.Value)
+	ecd.EmbedRingT(values, logSlots, plaintext.Scale, false, plaintext.Value)
 }
 
 // EncodeNew encodes a set of values on a new plaintext.
@@ -319,6 +315,13 @@ func (ecd *encoderComplex128) DecodePublic(plaintext *Plaintext, logSlots int, b
 // its related error) are zero.
 func (ecd *encoderComplex128) DecodeSlotsPublic(plaintext *Plaintext, logSlots int, bound float64) (res []complex128) {
 	return ecd.decodePublic(plaintext, logSlots, bound)
+}
+
+func (ecd *encoderComplex128) EncodeCoeffsRingT(values []float64, plaintext *PlaintextRingT) {
+	if len(values) > ecd.params.N() {
+		panic("cannot EncodeCoeffs : too many values (maximum is N)")
+	}
+	floatToFixedPointCRT(0, values, plaintext.Scale, ecd.params.RingQ(), plaintext.Value.Coeffs)
 }
 
 // EncodeCoeffs encodes the values on the coefficient of the plaintext polynomial.
@@ -504,7 +507,7 @@ func (ecd *encoderComplex128) Embed(values interface{}, logSlots int, scale floa
 	}
 }
 
-func (ecd *encoderComplex128) EmbedRingT(values interface{}, logSlots int, scale float64, montgomery bool, ifft bool, polyOut interface{}) {
+func (ecd *encoderComplex128) EmbedRingT(values interface{}, logSlots int, scale float64, montgomery bool, polyOut interface{}) {
 
 	if logSlots < minLogSlots || logSlots > ecd.params.MaxLogSlots() {
 		panic(fmt.Sprintf("cannot Embed: logSlots (%d) must be greater or equal to %d and smaller than %d\n", logSlots, minLogSlots, ecd.params.MaxLogSlots()))
@@ -561,12 +564,10 @@ func (ecd *encoderComplex128) EmbedRingT(values interface{}, logSlots int, scale
 		ecd.values[i] = 0
 	}
 
-	if ifft {
-		if logSlots < 4 {
-			SpecialiFFTVec(ecd.values, slots, ecd.m, ecd.rotGroup, ecd.roots)
-		} else {
-			SpecialiFFTUL8Vec(ecd.values, slots, ecd.m, ecd.rotGroup, ecd.roots)
-		}
+	if logSlots < 4 {
+		SpecialiFFTVec(ecd.values, slots, ecd.m, ecd.rotGroup, ecd.roots)
+	} else {
+		SpecialiFFTUL8Vec(ecd.values, slots, ecd.m, ecd.rotGroup, ecd.roots)
 	}
 
 	isRingStandard := ecd.params.RingType() == ring.Standard
