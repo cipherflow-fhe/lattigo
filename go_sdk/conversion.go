@@ -14,10 +14,10 @@ import (
 )
 
 //export BfvComponentNttInplace
-func BfvComponentNttInplace(parameter_handle uint64, coeff *C.ulong, lvl_idx int) {
+func BfvComponentNttInplace(parameter_handle uint64, coeff *C.uint64_t, lvl_idx int) {
 	param := get_object[bfv.Parameters](parameter_handle)
 	ringq := param.RingQ()
-	data_slice := unsafe.Slice((*uint64)(coeff), ringq.N)
+	data_slice := unsafe.Slice((*uint64)(unsafe.Pointer(coeff)), ringq.N)
 
 	if lvl_idx < param.QCount() {
 		ring.NTT(data_slice, data_slice, ringq.N, ringq.NttPsi[lvl_idx], ringq.Modulus[lvl_idx], ringq.MredParams[lvl_idx], ringq.BredParams[lvl_idx])
@@ -30,10 +30,10 @@ func BfvComponentNttInplace(parameter_handle uint64, coeff *C.ulong, lvl_idx int
 }
 
 //export BfvComponentInvNttInplace
-func BfvComponentInvNttInplace(parameter_handle uint64, coeff *C.ulong, lvl_idx int) {
+func BfvComponentInvNttInplace(parameter_handle uint64, coeff *C.uint64_t, lvl_idx int) {
 	param := get_object[bfv.Parameters](parameter_handle)
 	ringq := param.RingQ()
-	data_slice := unsafe.Slice((*uint64)(coeff), ringq.N)
+	data_slice := unsafe.Slice((*uint64)(unsafe.Pointer(coeff)), ringq.N)
 
 	if lvl_idx < param.QCount() {
 		ring.InvNTT(data_slice, data_slice, ringq.N, ringq.NttPsiInv[lvl_idx], ringq.NttNInv[lvl_idx], ringq.Modulus[lvl_idx], ringq.MredParams[lvl_idx])
@@ -45,10 +45,10 @@ func BfvComponentInvNttInplace(parameter_handle uint64, coeff *C.ulong, lvl_idx 
 }
 
 //export CkksComponentNttInplace
-func CkksComponentNttInplace(parameter_handle uint64, coeff *C.ulong, lvl_idx int) {
+func CkksComponentNttInplace(parameter_handle uint64, coeff *C.uint64_t, lvl_idx int) {
 	param := get_object[ckks.Parameters](parameter_handle)
 	ringq := param.RingQ()
-	data_slice := unsafe.Slice((*uint64)(coeff), ringq.N)
+	data_slice := unsafe.Slice((*uint64)(unsafe.Pointer(coeff)), ringq.N)
 
 	if lvl_idx < param.QCount() {
 		ring.NTT(data_slice, data_slice, ringq.N, ringq.NttPsi[lvl_idx], ringq.Modulus[lvl_idx], ringq.MredParams[lvl_idx], ringq.BredParams[lvl_idx])
@@ -61,10 +61,10 @@ func CkksComponentNttInplace(parameter_handle uint64, coeff *C.ulong, lvl_idx in
 }
 
 //export CkksComponentInvNttInplace
-func CkksComponentInvNttInplace(parameter_handle uint64, coeff *C.ulong, lvl_idx int) {
+func CkksComponentInvNttInplace(parameter_handle uint64, coeff *C.uint64_t, lvl_idx int) {
 	param := get_object[ckks.Parameters](parameter_handle)
 	ringq := param.RingQ()
-	data_slice := unsafe.Slice((*uint64)(coeff), ringq.N)
+	data_slice := unsafe.Slice((*uint64)(unsafe.Pointer(coeff)), ringq.N)
 
 	if lvl_idx < param.QCount() {
 		ring.InvNTT(data_slice, data_slice, ringq.N, ringq.NttPsiInv[lvl_idx], ringq.NttNInv[lvl_idx], ringq.Modulus[lvl_idx], ringq.MredParams[lvl_idx])
@@ -76,10 +76,10 @@ func CkksComponentInvNttInplace(parameter_handle uint64, coeff *C.ulong, lvl_idx
 }
 
 //export BfvComponentMulByPow2Inplace
-func BfvComponentMulByPow2Inplace(parameter_handle uint64, coeff *C.ulong, lvl_idx int, pow2 int) {
+func BfvComponentMulByPow2Inplace(parameter_handle uint64, coeff *C.uint64_t, lvl_idx int, pow2 int) {
 	param := get_object[bfv.Parameters](parameter_handle)
 	ringq := param.RingQ()
-	data_slice := unsafe.Slice((*uint64)(coeff), ringq.N)
+	data_slice := unsafe.Slice((*uint64)(unsafe.Pointer(coeff)), ringq.N)
 
 	if lvl_idx < param.QCount() {
 		ring.MFormVec(data_slice, data_slice, ringq.Modulus[lvl_idx], ringq.BredParams[lvl_idx])
@@ -94,10 +94,10 @@ func BfvComponentMulByPow2Inplace(parameter_handle uint64, coeff *C.ulong, lvl_i
 }
 
 //export CkksComponentMulByPow2Inplace
-func CkksComponentMulByPow2Inplace(parameter_handle uint64, coeff *C.ulong, lvl_idx int, pow2 int) {
+func CkksComponentMulByPow2Inplace(parameter_handle uint64, coeff *C.uint64_t, lvl_idx int, pow2 int) {
 	param := get_object[ckks.Parameters](parameter_handle)
 	ringq := param.RingQ()
-	data_slice := unsafe.Slice((*uint64)(coeff), ringq.N)
+	data_slice := unsafe.Slice((*uint64)(unsafe.Pointer(coeff)), ringq.N)
 
 	if lvl_idx < param.QCount() {
 		ring.MFormVec(data_slice, data_slice, ringq.Modulus[lvl_idx], ringq.BredParams[lvl_idx])

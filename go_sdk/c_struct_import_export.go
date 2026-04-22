@@ -29,7 +29,7 @@ func import_component(src *C.CComponent, dest *[]uint64) {
 func export_component(src *[]uint64, dest *C.CComponent) {
 	N := len(*src)
 	dest.n = C.int(N)
-	dest.data = (*C.ulong)(unsafe.Pointer(&(*src)[0]))
+	dest.data = (*C.uint64_t)(unsafe.Pointer(&(*src)[0]))
 }
 
 func import_polynomial(src *C.CPolynomial, dest *ring.Poly) {
@@ -42,7 +42,7 @@ func import_polynomial(src *C.CPolynomial, dest *ring.Poly) {
 func export_polynomial(src *ring.Poly, dest *C.CPolynomial) {
 	n_component := src.Level() + 1
 	dest.n_component = C.int(n_component)
-	dest.components = (*C.CComponent)(C.malloc(C.size_t(unsafe.Sizeof(C.CComponent{})) * C.ulong(n_component)))
+	dest.components = (*C.CComponent)(C.malloc(C.size_t(unsafe.Sizeof(C.CComponent{})) * C.size_t(n_component)))
 	component_slice := unsafe.Slice(dest.components, n_component)
 	for i := 0; i < n_component; i++ {
 		export_component(&src.Coeffs[i], &component_slice[i])
@@ -64,7 +64,7 @@ func export_polynomial_qp(src *ringqp.Poly, dest *C.CPolynomial, level int, sp_l
 	}
 	n_component := n_q_component + n_p_component
 	dest.n_component = C.int(n_component)
-	dest.components = (*C.CComponent)(C.malloc(C.size_t(unsafe.Sizeof(C.CComponent{})) * C.ulong(n_component)))
+	dest.components = (*C.CComponent)(C.malloc(C.size_t(unsafe.Sizeof(C.CComponent{})) * C.size_t(n_component)))
 	component_slice := unsafe.Slice(dest.components, n_component)
 	for i := 0; i < n_q_component; i++ {
 		export_component(&src.Q.Coeffs[i], &component_slice[i])
@@ -77,7 +77,7 @@ func export_polynomial_qp(src *ringqp.Poly, dest *C.CPolynomial, level int, sp_l
 func export_public_key(src *rlwe.CiphertextQP, dest *C.CPublicKey, level int, sp_level int) {
 	dest.level = C.int(level)
 	dest.degree = C.int(1)
-	dest.polys = (*C.CPolynomial)(C.malloc(C.size_t(unsafe.Sizeof(C.CPolynomial{})) * C.ulong(2)))
+	dest.polys = (*C.CPolynomial)(C.malloc(C.size_t(unsafe.Sizeof(C.CPolynomial{})) * C.size_t(2)))
 	poly_slice := unsafe.Slice(dest.polys, 2)
 	for i := 0; i < 2; i++ {
 		export_polynomial_qp(&src.Value[i], &poly_slice[i], level, sp_level)
@@ -96,7 +96,7 @@ func export_key_switch_key(src *rlwe.SwitchingKey, dest *C.CKeySwitchKey, level 
 		}
 	}
 	dest.n_public_key = C.int(n_public_key)
-	dest.public_keys = (*C.CPublicKey)(C.malloc(C.size_t(unsafe.Sizeof(C.CPublicKey{})) * C.ulong(n_public_key)))
+	dest.public_keys = (*C.CPublicKey)(C.malloc(C.size_t(unsafe.Sizeof(C.CPublicKey{})) * C.size_t(n_public_key)))
 	public_key_slice := unsafe.Slice(dest.public_keys, n_public_key)
 	for i := 0; i < n_public_key; i++ {
 		export_public_key(&src.Value[i][0], &public_key_slice[i], level, sp_level)
@@ -105,7 +105,7 @@ func export_key_switch_key(src *rlwe.SwitchingKey, dest *C.CKeySwitchKey, level 
 
 func export_galois_key(src *rlwe.RotationKeySet, dest *C.CGaloisKey, level int) {
 	n_key_switch_key := int(dest.n_key_switch_key)
-	dest.key_switch_keys = (*C.CKeySwitchKey)(C.malloc(C.size_t(unsafe.Sizeof(C.CKeySwitchKey{})) * C.ulong(n_key_switch_key)))
+	dest.key_switch_keys = (*C.CKeySwitchKey)(C.malloc(C.size_t(unsafe.Sizeof(C.CKeySwitchKey{})) * C.size_t(n_key_switch_key)))
 	gl_slice := unsafe.Slice(dest.galois_elements, n_key_switch_key)
 	key_switch_key_slice := unsafe.Slice(dest.key_switch_keys, n_key_switch_key)
 	for i := range gl_slice {
@@ -180,7 +180,7 @@ func ExportBfvCiphertext(ciphertext_handle uint64, c_ciphertext *C.CCiphertext) 
 	ciphertext := get_object[bfv.Ciphertext](ciphertext_handle)
 	c_ciphertext.level = C.int(ciphertext.Level())
 	c_ciphertext.degree = C.int(ciphertext.Degree())
-	c_ciphertext.polys = (*C.CPolynomial)(C.malloc(C.size_t(unsafe.Sizeof(C.CPolynomial{})) * C.ulong(ciphertext.Degree()+1)))
+	c_ciphertext.polys = (*C.CPolynomial)(C.malloc(C.size_t(unsafe.Sizeof(C.CPolynomial{})) * C.size_t(ciphertext.Degree()+1)))
 	poly_slice := unsafe.Slice(c_ciphertext.polys, ciphertext.Degree()+1)
 	for i := 0; i < ciphertext.Degree()+1; i++ {
 		export_polynomial(ciphertext.Value[i], &poly_slice[i])
@@ -192,7 +192,7 @@ func ExportCkksCiphertext(ciphertext_handle uint64, c_ciphertext *C.CCiphertext)
 	ciphertext := get_object[ckks.Ciphertext](ciphertext_handle)
 	c_ciphertext.level = C.int(ciphertext.Level())
 	c_ciphertext.degree = C.int(ciphertext.Degree())
-	c_ciphertext.polys = (*C.CPolynomial)(C.malloc(C.size_t(unsafe.Sizeof(C.CPolynomial{})) * C.ulong(ciphertext.Degree()+1)))
+	c_ciphertext.polys = (*C.CPolynomial)(C.malloc(C.size_t(unsafe.Sizeof(C.CPolynomial{})) * C.size_t(ciphertext.Degree()+1)))
 	poly_slice := unsafe.Slice(c_ciphertext.polys, ciphertext.Degree()+1)
 	for i := 0; i < ciphertext.Degree()+1; i++ {
 		export_polynomial(ciphertext.Value[i], &poly_slice[i])
