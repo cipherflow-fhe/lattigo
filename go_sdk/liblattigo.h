@@ -321,12 +321,12 @@ extern void ExportCkksCiphertext(GoUint64 ciphertext_handle, CCiphertext* c_ciph
 extern void ExportRelinKey(GoUint64 relin_key_handle, GoInt level, CRelinKey* c_relin_key);
 extern void ExportGaloisKey(GoUint64 galois_key_handle, GoInt level, CGaloisKey* c_galois_key);
 extern void ExportSwitchingKey(GoUint64 switch_key_handle, GoInt level, GoInt sp_level, CKeySwitchKey* c_switch_key);
-extern void BfvComponentNttInplace(GoUint64 parameter_handle, long unsigned int* coeff, GoInt lvl_idx);
-extern void BfvComponentInvNttInplace(GoUint64 parameter_handle, long unsigned int* coeff, GoInt lvl_idx);
-extern void CkksComponentNttInplace(GoUint64 parameter_handle, long unsigned int* coeff, GoInt lvl_idx);
-extern void CkksComponentInvNttInplace(GoUint64 parameter_handle, long unsigned int* coeff, GoInt lvl_idx);
-extern void BfvComponentMulByPow2Inplace(GoUint64 parameter_handle, long unsigned int* coeff, GoInt lvl_idx, GoInt pow2);
-extern void CkksComponentMulByPow2Inplace(GoUint64 parameter_handle, long unsigned int* coeff, GoInt lvl_idx, GoInt pow2);
+extern void BfvComponentNttInplace(GoUint64 parameter_handle, uint64_t* coeff, GoInt lvl_idx);
+extern void BfvComponentInvNttInplace(GoUint64 parameter_handle, uint64_t* coeff, GoInt lvl_idx);
+extern void CkksComponentNttInplace(GoUint64 parameter_handle, uint64_t* coeff, GoInt lvl_idx);
+extern void CkksComponentInvNttInplace(GoUint64 parameter_handle, uint64_t* coeff, GoInt lvl_idx);
+extern void BfvComponentMulByPow2Inplace(GoUint64 parameter_handle, uint64_t* coeff, GoInt lvl_idx, GoInt pow2);
+extern void CkksComponentMulByPow2Inplace(GoUint64 parameter_handle, uint64_t* coeff, GoInt lvl_idx, GoInt pow2);
 extern void BfvPlaintextMulInvMFormAndMulByPow2(GoUint64 parameter_handle, GoUint64 plaintext_mul_handle, GoInt pow2);
 extern void CkksPlaintextMulInvMFormAndMulByPow2(GoUint64 parameter_handle, GoUint64 plaintext_mul_handle, GoInt pow2);
 extern void BfvRlkInvMForm(GoUint64 parameter_handle, GoUint64 relin_key_handle);
