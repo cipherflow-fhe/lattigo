@@ -105,8 +105,6 @@ extern "C" {
 
 extern char* GetErrorMessage();
 extern GoUint64 CreateBfvParameter(GoUint64 N, GoUint64 T);
-extern GoUint64 CreateCustomBfvParameter();
-extern GoUint64 CreateCustomCkksParameter();
 extern GoUint64 CreateCkksParameter(GoUint64 N);
 extern GoUint64 CreateBfvParameterV2(GoUint64 T);
 extern GoUint64 CreateCkksParameterV2();

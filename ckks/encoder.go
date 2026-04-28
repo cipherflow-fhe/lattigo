@@ -321,7 +321,20 @@ func (ecd *encoderComplex128) EncodeCoeffsRingT(values []float64, plaintext *Pla
 	if len(values) > ecd.params.N() {
 		panic("cannot EncodeCoeffs : too many values (maximum is N)")
 	}
-	floatToFixedPointCRT(0, values, plaintext.Scale, ecd.params.RingQ(), plaintext.Value.Coeffs)
+	if ecd.params.IsFpga {
+		msg_scale := plaintext.Scale / float64(1<<(32-26))
+		serialize_data_bit_length_from_ckks_param := func(param Parameters) int {
+			primes := append(param.Q(), param.P()...)
+			sort.Slice(primes, func(i, j int) bool { return primes[i] < primes[j] })
+			return bits.Len64(primes[len(primes)-1])
+		}
+		data_bit_length := serialize_data_bit_length_from_ckks_param(ecd.params)
+		for i, v := range values {
+			singleFloatToFixedPointFpga(i, v, msg_scale, data_bit_length, plaintext.Value.Coeffs[0])
+		}
+	} else {
+		floatToFixedPointCRT(0, values, plaintext.Scale, ecd.params.RingQ(), plaintext.Value.Coeffs)
+	}
 }
 
 // EncodeCoeffs encodes the values on the coefficient of the plaintext polynomial.

@@ -155,48 +155,6 @@ func CreateBfvParameter(N uint64, T uint64) uint64 {
 	return id
 }
 
-//export CreateCustomBfvParameter
-func CreateCustomBfvParameter() uint64 {
-	param_literal := bfv.ParametersLiteral{
-		LogN:  14,
-		T:     65537,
-		Q:     []uint64{0x7f000001, 0x7f180001, 0x7f3c0001, 0x7f420001, 0x7f440001, 0x7f4e0001, 0x7fb40001, 0x7fd20001, 0x7fea0001, 0x7ff80001, 0x7ffe0001, 0xffa20001, 0xffac0001},
-		P:     []uint64{0xffd20001, 0xfff00001},
-		Sigma: rlwe.DefaultSigma,
-	}
-	param, err := bfv.NewParametersFromLiteral(param_literal)
-	if err != nil {
-		panic(err)
-	}
-
-	id := insert_object(&param)
-	return id
-}
-
-//export CreateCustomCkksParameter
-func CreateCustomCkksParameter() uint64 {
-	param_literal := ckks.ParametersLiteral{
-		LogN:         14,
-		Q:            []uint64{4288184321, 4288806913, 4288905217, 4289462273, 4291952641, 4292018177, 4292116481, 4292149249, 4292313089, 4292804609, 4293230593, 4293918721},
-		P:            []uint64{4294475777},
-		LogSlots:     13,
-		DefaultScale: 1 << 31,
-	}
-	// param, err := ckks.NewParametersFromLiteral(param_literal)
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	// id := insert_object(&param)
-	param, err := ckks.NewParametersFromLiteral(param_literal)
-	if err != nil {
-		panic(err)
-	}
-
-	id := insert_object(&param)
-	return id
-}
-
 //export CreateCkksParameter
 func CreateCkksParameter(N uint64) uint64 {
 	var literal ckks.ParametersLiteral
