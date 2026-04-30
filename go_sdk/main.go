@@ -2037,6 +2037,19 @@ func CkksEncode(context_handle uint64, message_array *C.double, mg_len int, leve
 	return id
 }
 
+//export CkksEncodeWithSlots
+func CkksEncodeWithSlots(context_handle uint64, message_array *C.double, mg_len int, level int, scale float64, log_slots int) uint64 {
+	context := get_ckks_context(context_handle)
+
+	// Create a slice corresponding to the C array so that it can be indexed
+	slice := unsafe.Slice((*float64)(message_array), mg_len)
+	plaintext := ckks.NewPlaintext(*context.parameter, level, scale)
+	context.encoder.EncodeSlots(slice, plaintext, log_slots)
+
+	id := insert_object(plaintext)
+	return id
+}
+
 //export CkksEncodeComplex
 func CkksEncodeComplex(context_handle uint64, message_array *C.double, mg_len int, level int, scale float64) uint64 {
 	context := get_ckks_context(context_handle)
@@ -2054,6 +2067,23 @@ func CkksEncodeComplex(context_handle uint64, message_array *C.double, mg_len in
 	return id
 }
 
+//export CkksEncodeComplexWithSlots
+func CkksEncodeComplexWithSlots(context_handle uint64, message_array *C.double, mg_len int, level int, scale float64, log_slots int) uint64 {
+	context := get_ckks_context(context_handle)
+
+	// Create a slice corresponding to the C array so that it can be indexed
+	slice := unsafe.Slice((*float64)(message_array), mg_len*2)
+	message := make([]complex128, mg_len)
+	for i := 0; i < mg_len; i++ {
+		message[i] = complex(slice[i*2], slice[i*2+1])
+	}
+	plaintext := ckks.NewPlaintext(*context.parameter, level, scale)
+	context.encoder.EncodeSlots(message, plaintext, log_slots)
+
+	id := insert_object(plaintext)
+	return id
+}
+
 //export CkksEncodeRingt
 func CkksEncodeRingt(context_handle uint64, message_array *C.double, mg_len int, scale float64) uint64 {
 	context := get_ckks_context(context_handle)
@@ -2066,6 +2096,18 @@ func CkksEncodeRingt(context_handle uint64, message_array *C.double, mg_len int,
 	return id
 }
 
+//export CkksEncodeRingtWithSlots
+func CkksEncodeRingtWithSlots(context_handle uint64, message_array *C.double, mg_len int, scale float64, log_slots int) uint64 {
+	context := get_ckks_context(context_handle)
+
+	slice := unsafe.Slice((*float64)(message_array), mg_len)
+	plaintext := ckks.NewPlaintextRingT(*context.parameter, scale)
+	context.encoder.EncodeRingT(slice, plaintext, log_slots)
+
+	id := insert_object(plaintext)
+	return id
+}
+
 //export CkksEncodeMul
 func CkksEncodeMul(context_handle uint64, message_array *C.double, mg_len int, level int, scale float64) uint64 {
 	context := get_ckks_context(context_handle)
@@ -2073,6 +2115,21 @@ func CkksEncodeMul(context_handle uint64, message_array *C.double, mg_len int, l
 
 	slice := unsafe.Slice((*float64)(message_array), mg_len)
 	plaintext := context.encoder.EncodeNew(slice, level, scale, context.parameter.LogSlots())
+	plaintext_mul := ckks.NewPlaintextMul(*context.parameter, level, scale)
+	ringq.MForm(plaintext.Value, plaintext_mul.Value)
+
+	id := insert_object(plaintext_mul)
+	return id
+
+}
+
+//export CkksEncodeMulWithSlots
+func CkksEncodeMulWithSlots(context_handle uint64, message_array *C.double, mg_len int, level int, scale float64, log_slots int) uint64 {
+	context := get_ckks_context(context_handle)
+	ringq := context.parameter.RingQ()
+
+	slice := unsafe.Slice((*float64)(message_array), mg_len)
+	plaintext := context.encoder.EncodeNew(slice, level, scale, log_slots)
 	plaintext_mul := ckks.NewPlaintextMul(*context.parameter, level, scale)
 	ringq.MForm(plaintext.Value, plaintext_mul.Value)
 
@@ -2175,6 +2232,18 @@ func CkksDecodeCoeffs(context_handle uint64, plaintext_handle uint64, raw_data *
 	context := get_ckks_context(context_handle)
 	plaintext := get_object[ckks.Plaintext](plaintext_handle)
 	message := context.encoder.DecodeCoeffs(plaintext)
+
+	*raw_data = (*C.double)(unsafe.Pointer(&message[0]))
+	*length = (C.uint64_t)(len(message))
+	id := insert_object(&message)
+	return id
+}
+
+//export CkksDecodeWithSlots
+func CkksDecodeWithSlots(context_handle uint64, plaintext_handle uint64, raw_data **C.double, length *C.uint64_t, log_slots int) uint64 {
+	context := get_ckks_context(context_handle)
+	plaintext := get_object[ckks.Plaintext](plaintext_handle)
+	message := context.encoder.DecodeSlots(plaintext, log_slots)
 
 	*raw_data = (*C.double)(unsafe.Pointer(&message[0]))
 	*length = (C.uint64_t)(len(message))

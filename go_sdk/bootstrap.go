@@ -62,6 +62,58 @@ func CreateCkksToyBtpParameter() uint64 {
 	return id
 }
 
+//export CreateCkksBtpParameterWithLogSlots
+func CreateCkksBtpParameterWithLogSlots(log_slots int) uint64 {
+	literal := bootstrapping.N16QP1546H192H32
+	ckks_params := literal.SchemeParams
+	btpParams := literal.BootstrappingParams
+
+	params, err := ckks.NewParametersFromLiteral(ckks_params)
+	if err != nil {
+		panic(err)
+	}
+
+	if log_slots > params.LogSlots() || log_slots <= 1 {
+		panic("log_slots must be in the range [2, params.LogSlots()]")
+	}
+
+	val := new(int)
+	*val = int(log_slots)
+	btpParams.LogSlots = val
+
+	btp_param := BtpParameterSet{params, btpParams}
+	id := insert_object(&btp_param)
+	return id
+}
+
+//export CreateCkksToyBtpParameterWithLogSlots
+func CreateCkksToyBtpParameterWithLogSlots(log_slots int) uint64 {
+	literal := bootstrapping.N16QP1546H192H32
+	ckks_params := literal.SchemeParams
+	btpParams := literal.BootstrappingParams
+
+	// Important: the following N value is not secure, and should be used only for development.
+	ckks_params.LogN = 13
+	ckks_params.LogSlots = 12
+
+	params, err := ckks.NewParametersFromLiteral(ckks_params)
+	if err != nil {
+		panic(err)
+	}
+
+	if log_slots > params.LogSlots() || log_slots <= 1 {
+		panic("log_slots must be in the range [2, params.LogSlots()]")
+	}
+
+	val := new(int)
+	*val = int(log_slots)
+	btpParams.LogSlots = val
+
+	btp_param := BtpParameterSet{params, btpParams}
+	id := insert_object(&btp_param)
+	return id
+}
+
 //export GetCkksParameterFromBtpParameter
 func GetCkksParameterFromBtpParameter(parameter_handle uint64) uint64 {
 	param := get_object[BtpParameterSet](parameter_handle)
@@ -99,6 +151,45 @@ func CreateRandomCkksBtpContext(parameter_handle uint64) uint64 {
 	if err != nil {
 		panic(err)
 	}
+
+	id := insert_object(&context)
+	return id
+}
+
+//export CreateCkksBtpContextFromSK
+func CreateCkksBtpContextFromSK(parameter_handle uint64, sk_handle uint64) uint64 {
+	param := get_object[BtpParameterSet](parameter_handle)
+	sk := get_object[rlwe.SecretKey](sk_handle)
+
+	var context CkksBtpContext
+
+	context.parameter = &param.SchemeParam
+	context.btp_parameter = &param.BtpParam
+	context.encoder = ckks.NewEncoder(*context.parameter)
+	context.kgen = ckks.NewKeyGenerator(*context.parameter)
+	context.sk = sk
+	context.pk = context.kgen.GenPublicKey(context.sk)
+
+	// Generate bootstrap evaluation keys first
+	context.evk = new(bootstrapping.EvaluationKeys)
+	*context.evk = bootstrapping.GenEvaluationKeys(*context.btp_parameter, *context.parameter, context.sk)
+
+	// Point rlk and gk to evk's keys (shared references, not copies)
+	context.rlk = context.evk.Rlk
+	context.gk = context.evk.Rtks
+
+	context.encryptor_pk = nil
+	context.encryptor_sk = nil
+	context.decryptor = nil
+	context.evaluator = ckks.NewEvaluator(*context.parameter, rlwe.EvaluationKey{
+		Rlk: context.rlk,
+	})
+	var err error
+	context.bootstrapper, err = bootstrapping.NewBootstrapper(*context.parameter, *context.btp_parameter, *context.evk)
+	if err != nil {
+		panic(err)
+	}
+	context.sk = nil // Clear secret key from context for security
 
 	id := insert_object(&context)
 	return id

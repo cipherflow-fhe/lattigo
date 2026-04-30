@@ -217,9 +217,13 @@ extern GoUint64 BfvEncodeCoeffs(GoUint64 context_handle, uint64_t* message_array
 extern GoUint64 BfvEncodeCoeffsRingt(GoUint64 context_handle, uint64_t* message_array, GoInt mg_len);
 extern GoUint64 BfvEncodeCoeffsMul(GoUint64 context_handle, uint64_t* message_array, GoInt mg_len, GoInt level);
 extern GoUint64 CkksEncode(GoUint64 context_handle, double* message_array, GoInt mg_len, GoInt level, GoFloat64 scale);
+extern GoUint64 CkksEncodeWithSlots(GoUint64 context_handle, double* message_array, GoInt mg_len, GoInt level, GoFloat64 scale, GoInt log_slots);
 extern GoUint64 CkksEncodeComplex(GoUint64 context_handle, double* message_array, GoInt mg_len, GoInt level, GoFloat64 scale);
+extern GoUint64 CkksEncodeComplexWithSlots(GoUint64 context_handle, double* message_array, GoInt mg_len, GoInt level, GoFloat64 scale, GoInt log_slots);
 extern GoUint64 CkksEncodeRingt(GoUint64 context_handle, double* message_array, GoInt mg_len, GoFloat64 scale);
+extern GoUint64 CkksEncodeRingtWithSlots(GoUint64 context_handle, double* message_array, GoInt mg_len, GoFloat64 scale, GoInt log_slots);
 extern GoUint64 CkksEncodeMul(GoUint64 context_handle, double* message_array, GoInt mg_len, GoInt level, GoFloat64 scale);
+extern GoUint64 CkksEncodeMulWithSlots(GoUint64 context_handle, double* message_array, GoInt mg_len, GoInt level, GoFloat64 scale, GoInt log_slots);
 extern GoUint64 CkksEncodeCoeffs(GoUint64 context_handle, double* message_array, GoInt mg_len, GoInt level, GoFloat64 scale);
 extern GoUint64 CkksEncodeCoeffsRingt(GoUint64 context_handle, double* message_array, GoInt mg_len, GoFloat64 scale);
 extern GoUint64 CkksEncodeCoeffsMul(GoUint64 context_handle, double* message_array, GoInt mg_len, GoInt level, GoFloat64 scale);
@@ -228,6 +232,7 @@ extern GoUint64 BfvDecodeRingt(GoUint64 context_handle, GoUint64 plaintext_handl
 extern GoUint64 BfvDecodeCoeffs(GoUint64 context_handle, GoUint64 plaintext_handle, uint64_t** raw_data, uint64_t* length);
 extern GoUint64 CkksDecode(GoUint64 context_handle, GoUint64 plaintext_handle, double** raw_data, uint64_t* length);
 extern GoUint64 CkksDecodeCoeffs(GoUint64 context_handle, GoUint64 plaintext_handle, double** raw_data, uint64_t* length);
+extern GoUint64 CkksDecodeWithSlots(GoUint64 context_handle, GoUint64 plaintext_handle, double** raw_data, uint64_t* length, GoInt log_slots);
 extern GoUint64 CkksRecodeBigComplex(GoUint64 context_handle, GoUint64 plaintext_handle, GoInt level, GoFloat64 scale);
 extern GoUint64 BfvEncryptAsymmetric(GoUint64 context_handle, GoUint64 plaintext_handle);
 extern GoUint64 CkksEncryptAsymmetric(GoUint64 context_handle, GoUint64 plaintext_handle);
@@ -289,8 +294,11 @@ extern GoUint64 PolyEvalFunction(void* f, GoUint64 context_handle, GoUint64 x_ci
 extern GoUint64 PolyEvalReluFunction(GoUint64 context_handle, GoUint64 x_ciphertext_handle, GoFloat64 left, GoFloat64 right, GoInt degree);
 extern GoUint64 CreateCkksBtpParameter();
 extern GoUint64 CreateCkksToyBtpParameter();
+extern GoUint64 CreateCkksBtpParameterWithLogSlots(GoInt log_slots);
+extern GoUint64 CreateCkksToyBtpParameterWithLogSlots(GoInt log_slots);
 extern GoUint64 GetCkksParameterFromBtpParameter(GoUint64 parameter_handle);
 extern GoUint64 CreateRandomCkksBtpContext(GoUint64 parameter_handle);
+extern GoUint64 CreateCkksBtpContextFromSK(GoUint64 parameter_handle, GoUint64 sk_handle);
 extern void GenCkksBtpContextRotationKeys(GoUint64 context_handle);
 extern void GenCkksBtpContextRotationKeysForRotations(GoUint64 context_handle, GoInt32* rots, GoInt rots_length, GoUint8 include_swap_rows);
 extern GoUint64 ShallowCopyCkksBtpContext(GoUint64 context_handle);

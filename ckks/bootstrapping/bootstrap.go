@@ -56,7 +56,11 @@ func (btp *Bootstrapper) Bootstrapp(ctIn *ckks.Ciphertext) (ctOut *ckks.Cipherte
 	}
 
 	//SubSum X -> (N/dslots) * Y^dslots
-	btp.Trace(ctOut, btp.params.LogSlots(), ctOut)
+	logSlots := btp.params.LogSlots()
+	if btp.LogSlots != nil {
+		logSlots = *btp.LogSlots
+	}
+	btp.Trace(ctOut, logSlots, ctOut)
 
 	// Step 2 : CoeffsToSlots (Homomorphic encoding)
 	ctReal, ctImag := btp.CoeffsToSlotsNew(ctOut, btp.ctsMatrices)

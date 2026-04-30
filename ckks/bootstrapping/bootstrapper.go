@@ -22,6 +22,8 @@ type bootstrapperBase struct {
 
 	dslots    int // Number of plaintext slots after the re-encoding
 	logdslots int
+	// NOTE: dslots and logdslots are totally not used in the current implementation
+	// To find logslots for sparse packing, use Parameters.logSlots instead of logdslots
 
 	evalModPoly advanced.EvalModPoly
 	stcMatrices advanced.EncodingMatrix
@@ -161,7 +163,12 @@ func (bb *bootstrapperBase) CheckKeys(btpKeys EvaluationKeys) (err error) {
 		}
 	}
 
-	for _, galEl := range bb.params.GaloisElementsForTrace(bb.params.LogSlots()) {
+	logSlots := bb.params.LogSlots()
+	if bb.Parameters.LogSlots != nil {
+		logSlots = *bb.Parameters.LogSlots
+	}
+
+	for _, galEl := range bb.params.GaloisElementsForTrace(logSlots) {
 		if _, generated := btpKeys.Rtks.Keys[galEl]; !generated {
 			rotMissing = append(rotMissing, int(galEl))
 		}
@@ -179,9 +186,17 @@ func newBootstrapperBase(params ckks.Parameters, btpParams Parameters, btpKey Ev
 	bb.params = params
 	bb.Parameters = btpParams
 
-	bb.dslots = params.Slots()
-	bb.logdslots = params.LogSlots()
-	if params.LogSlots() < params.MaxLogSlots() {
+	logSlots := params.LogSlots()
+	if bb.Parameters.LogSlots != nil {
+		logSlots = *bb.Parameters.LogSlots
+	}
+	slots := 1 << logSlots
+
+	bb.dslots = slots
+	bb.logdslots = logSlots
+	// bb.dslots, bb.logdslots are not used
+	// the following condition is useless, but we keep it for consistency
+	if logSlots < params.MaxLogSlots() {
 		bb.dslots <<= 1
 		bb.logdslots++
 	}
@@ -190,7 +205,7 @@ func newBootstrapperBase(params ckks.Parameters, btpParams Parameters, btpKey Ev
 
 	scFac := bb.evalModPoly.ScFac()
 	K := bb.evalModPoly.K() / scFac
-	n := float64(2 * params.Slots())
+	n := float64(2 * slots)
 
 	// Correcting factor for approximate division by Q
 	// The second correcting factor for approximate multiplication by Q is included in the coefficients of the EvalMod polynomials
@@ -214,14 +229,14 @@ func newBootstrapperBase(params ckks.Parameters, btpParams Parameters, btpKey Ev
 	// CoeffsToSlots vectors
 	// Change of variable for the evaluation of the Chebyshev polynomial + cancelling factor for the DFT and SubSum + eventual scaling factor for the double angle formula
 	bb.CoeffsToSlotsParameters.LogN = params.LogN()
-	bb.CoeffsToSlotsParameters.LogSlots = params.LogSlots()
+	bb.CoeffsToSlotsParameters.LogSlots = logSlots
 	bb.CoeffsToSlotsParameters.Scaling = qDiv / (K * n * scFac * qDiff)
 	bb.ctsMatrices = advanced.NewHomomorphicEncodingMatrixFromLiteral(bb.CoeffsToSlotsParameters, encoder)
 
 	// SlotsToCoeffs vectors
 	// Rescaling factor to set the final ciphertext to the desired scale
 	bb.SlotsToCoeffsParameters.LogN = params.LogN()
-	bb.SlotsToCoeffsParameters.LogSlots = params.LogSlots()
+	bb.SlotsToCoeffsParameters.LogSlots = logSlots
 	bb.SlotsToCoeffsParameters.Scaling = bb.params.DefaultScale() / (bb.evalModPoly.ScalingFactor() / bb.evalModPoly.MessageRatio())
 	bb.stcMatrices = advanced.NewHomomorphicEncodingMatrixFromLiteral(bb.SlotsToCoeffsParameters, encoder)
 

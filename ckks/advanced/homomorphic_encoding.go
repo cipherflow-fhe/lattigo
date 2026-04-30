@@ -313,11 +313,23 @@ func (mParams *EncodingMatrixLiteral) computeBootstrappingDFTIndexMap() (rotatio
 
 		level -= depth
 	}
+	firstnonZero := 0
+	for i := range merge {
+		if merge[i] > 0 {
+			firstnonZero = i
+			break
+		}
+	}
 
 	level = logSlots
 	for i := 0; i < maxDepth; i++ {
 
-		if logSlots < logN-1 && ltType == SlotsToCoeffs && i == 0 && repacki2r {
+		if merge[i] == 0 {
+			rotationMap[i] = map[int]bool{0: true}
+			continue
+		}
+
+		if logSlots < logN-1 && ltType == SlotsToCoeffs && i == firstnonZero && repacki2r {
 
 			// Special initial matrix for the repacking before SlotsToCoeffs
 			rotationMap[i] = genWfftRepackIndexMap(logSlots, level)
@@ -448,11 +460,28 @@ func (mParams *EncodingMatrixLiteral) computeDFTMatrices() (plainVector []map[in
 
 		fftLevel -= depth
 	}
+	firstnonZero := 0
+	for i := range merge {
+		if merge[i] > 0 {
+			firstnonZero = i
+			break
+		}
+	}
 
 	fftLevel = logSlots
 	for i := 0; i < maxDepth; i++ {
 
-		if logSlots != logdSlots && ltType == SlotsToCoeffs && i == 0 && mParams.RepackImag2Real {
+		if merge[i] == 0 {
+			vec := make(map[int][]complex128)
+			ones := make([]complex128, 1<<logdSlots)
+			for k := range ones {
+				ones[k] = complex(1, 0) // Identity matrix, no rotation needed
+			}
+			vec[0] = ones
+			plainVector[i] = vec
+			continue
+		}
+		if logSlots != logdSlots && ltType == SlotsToCoeffs && i == firstnonZero && mParams.RepackImag2Real {
 
 			// Special initial matrix for the repacking before SlotsToCoeffs
 			plainVector[i] = genRepackMatrix(logSlots, bitreversed)
