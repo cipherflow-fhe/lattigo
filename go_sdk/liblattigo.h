@@ -34,6 +34,7 @@ typedef struct { const char *p; ptrdiff_t n; } _GoString_;
 #line 3 "c_struct_import_export.go"
 
 #include "../../fhe_types_v2.h"
+#include <stdlib.h>
 
 #line 1 "cgo-generated-wrapper"
 
@@ -312,38 +313,23 @@ extern void ImportBfvCiphertext(GoUint64 dest_handle, CCiphertext* c_ciphertext)
 extern void ImportCkksCiphertext(GoUint64 dest_handle, CCiphertext* c_ciphertext);
 extern void ExportBfvPlaintextRingt(GoUint64 plaintext_ringt_handle, CPlaintext* c_plaintext);
 extern void ExportCkksPlaintextRingt(GoUint64 plaintext_ringt_handle, CPlaintext* c_plaintext);
-extern void ExportBfvPlaintextMul(GoUint64 plaintext_mul_handle, CPlaintext* c_plaintext);
-extern void ExportCkksPlaintextMul(GoUint64 plaintext_mul_handle, CPlaintext* c_plaintext);
+extern void ExportBfvPlaintextMul(GoUint64 parameter_handle, GoUint64 plaintext_mul_handle, GoInt mf_nbits, CPlaintext* c_plaintext);
+extern void ExportCkksPlaintextMul(GoUint64 parameter_handle, GoUint64 plaintext_mul_handle, GoInt mf_nbits, CPlaintext* c_plaintext);
 extern void ExportBfvPlaintext(GoUint64 plaintext_handle, CPlaintext* c_plaintext);
 extern void ExportCkksPlaintext(GoUint64 plaintext_handle, CPlaintext* c_plaintext);
 extern void ExportBfvCiphertext(GoUint64 ciphertext_handle, CCiphertext* c_ciphertext);
 extern void ExportCkksCiphertext(GoUint64 ciphertext_handle, CCiphertext* c_ciphertext);
-extern void ExportRelinKey(GoUint64 relin_key_handle, GoInt level, CRelinKey* c_relin_key);
-extern void ExportGaloisKey(GoUint64 galois_key_handle, GoInt level, CGaloisKey* c_galois_key);
-extern void ExportSwitchingKey(GoUint64 switch_key_handle, GoInt level, GoInt sp_level, CKeySwitchKey* c_switch_key);
+extern void ExportBfvRelinKey(GoUint64 parameter_handle, GoUint64 relin_key_handle, GoInt level, GoInt key_mf_nbits, CRelinKey* c_relin_key);
+extern void ExportCkksRelinKey(GoUint64 parameter_handle, GoUint64 relin_key_handle, GoInt level, GoInt key_mf_nbits, CRelinKey* c_relin_key);
+extern void ExportBfvGaloisKey(GoUint64 parameter_handle, GoUint64 galois_key_handle, GoInt level, GoInt key_mf_nbits, CGaloisKey* c_galois_key);
+extern void ExportCkksGaloisKey(GoUint64 parameter_handle, GoUint64 galois_key_handle, GoInt level, GoInt key_mf_nbits, CGaloisKey* c_galois_key);
+extern void ExportCkksSwitchingKey(GoUint64 parameter_handle, GoUint64 switching_key_handle, GoInt level, GoInt sp_level, GoInt key_mf_nbits, CKeySwitchKey* c_switch_key);
 extern void BfvComponentNttInplace(GoUint64 parameter_handle, long unsigned int* coeff, GoInt lvl_idx);
 extern void BfvComponentInvNttInplace(GoUint64 parameter_handle, long unsigned int* coeff, GoInt lvl_idx);
 extern void CkksComponentNttInplace(GoUint64 parameter_handle, long unsigned int* coeff, GoInt lvl_idx);
 extern void CkksComponentInvNttInplace(GoUint64 parameter_handle, long unsigned int* coeff, GoInt lvl_idx);
 extern void BfvComponentMulByPow2Inplace(GoUint64 parameter_handle, long unsigned int* coeff, GoInt lvl_idx, GoInt pow2);
 extern void CkksComponentMulByPow2Inplace(GoUint64 parameter_handle, long unsigned int* coeff, GoInt lvl_idx, GoInt pow2);
-extern void BfvPlaintextMulInvMFormAndMulByPow2(GoUint64 parameter_handle, GoUint64 plaintext_mul_handle, GoInt pow2);
-extern void CkksPlaintextMulInvMFormAndMulByPow2(GoUint64 parameter_handle, GoUint64 plaintext_mul_handle, GoInt pow2);
-extern void BfvRlkInvMForm(GoUint64 parameter_handle, GoUint64 relin_key_handle);
-extern void BfvRlkInvMFormAndMulByPow2(GoUint64 parameter_handle, GoUint64 relin_key_handle, GoInt pow2);
-extern void BfvGlkInvMForm(GoUint64 parameter_handle, GoUint64 galois_key_handle);
-extern void BfvGlkInvMFormAndMulByPow2(GoUint64 parameter_handle, GoUint64 galois_key_handle, GoInt pow2);
-extern void CkksRlkInvMForm(GoUint64 parameter_handle, GoUint64 relin_key_handle);
-extern void CkksRlkInvMFormAndMulByPow2(GoUint64 parameter_handle, GoUint64 relin_key_handle, GoInt pow2);
-extern void CkksGlkInvMForm(GoUint64 parameter_handle, GoUint64 galois_key_handle);
-extern void CkksGlkInvMFormAndMulByPow2(GoUint64 parameter_handle, GoUint64 galois_key_handle, GoInt pow2);
-extern void SetBfvRlkNMFormBits(GoUint64 parameter_handle, GoUint64 relin_key_handle, GoInt n_mform_bits);
-extern void SetCkksRlkNMFormBits(GoUint64 parameter_handle, GoUint64 relin_key_handle, GoInt n_mform_bits);
-extern void SetBfvGlkNMFormBits(GoUint64 parameter_handle, GoUint64 galois_key_handle, GoInt n_mform_bits);
-extern void SetBfvGlkNMFormBitsForGaloisElement(GoUint64 parameter_handle, GoUint64 galois_key_handle, GoUint64 galois_element, GoInt n_mform_bits);
-extern void SetCkksSwkNMFormBits(GoUint64 parameter_handle, GoUint64 switching_key_handle, GoInt n_mform_bits);
-extern void SetCkksGlkNMFormBits(GoUint64 parameter_handle, GoUint64 galois_key_handle, GoInt n_mform_bits);
-extern void SetCkksGlkNMFormBitsForGaloisElement(GoUint64 parameter_handle, GoUint64 galois_key_handle, GoUint64 galois_element, GoInt n_mform_bits);
 extern GoUint64 CreateRandomDBfvContext(GoUint64 context_handle, GoUint8* crs_seed, GoFloat64 sigma_smudging);
 extern GoUint64 GetDBfvBfvContext(GoUint64 context_handle);
 extern GoUint64 CreateCKGContext(GoUint64 context_handle);

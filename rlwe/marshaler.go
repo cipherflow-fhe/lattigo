@@ -321,7 +321,6 @@ func (rlk *RelinearizationKey) UnmarshalBinary(data []byte) (err error) {
 		if inc, err = rlk.Keys[i].Decode(data[pointer:]); err != nil {
 			return err
 		}
-		rlk.Keys[i].NMFormBits = 64
 		pointer += inc
 	}
 
