@@ -1,7 +1,7 @@
 package main
 
 /*
-#include "../../fhe_types_v2.h"
+#include "../../../abi/c_types.h"
 #include <stdlib.h>
 */
 import "C"

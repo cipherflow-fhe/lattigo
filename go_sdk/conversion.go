@@ -1,8 +1,5 @@
 package main
 
-/*
-#include "../../fhe_types_v2.h"
-*/
 import "C"
 import (
 	"unsafe"

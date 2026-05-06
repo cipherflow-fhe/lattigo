@@ -21,32 +21,28 @@ typedef struct { const char *p; ptrdiff_t n; } _GoString_;
 
 #line 3 "main.go"
 
-#include "../../fhe_types_v2.h"
+#include "../../bridge.h"
+#include <stdint.h>
 
 #line 1 "cgo-generated-wrapper"
 
 #line 3 "bootstrap.go"
 
-#include "../../fhe_types_v2.h"
+#include <stdint.h>
 
 #line 1 "cgo-generated-wrapper"
 
 #line 3 "c_struct_import_export.go"
 
-#include "../../fhe_types_v2.h"
+#include "../../../abi/c_types.h"
 #include <stdlib.h>
 
 #line 1 "cgo-generated-wrapper"
 
-#line 3 "conversion.go"
-
-#include "../../fhe_types_v2.h"
-
-#line 1 "cgo-generated-wrapper"
 
 #line 3 "multiparty.go"
 
-#include "../../fhe_types_v2.h"
+#include <stdint.h>
 
 #line 1 "cgo-generated-wrapper"
 

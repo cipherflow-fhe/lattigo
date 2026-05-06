@@ -1,7 +1,8 @@
 package main
 
 /*
-#include "../../fhe_types_v2.h"
+#include "../../bridge.h"
+#include <stdint.h>
 */
 import "C"
 import (
