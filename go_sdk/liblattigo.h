@@ -320,12 +320,12 @@ extern void ExportCkksRelinKey(GoUint64 parameter_handle, GoUint64 relin_key_han
 extern void ExportBfvGaloisKey(GoUint64 parameter_handle, GoUint64 galois_key_handle, GoInt level, GoInt key_mf_nbits, CGaloisKey* c_galois_key);
 extern void ExportCkksGaloisKey(GoUint64 parameter_handle, GoUint64 galois_key_handle, GoInt level, GoInt key_mf_nbits, CGaloisKey* c_galois_key);
 extern void ExportCkksSwitchingKey(GoUint64 parameter_handle, GoUint64 switching_key_handle, GoInt level, GoInt sp_level, GoInt key_mf_nbits, CKeySwitchKey* c_switch_key);
-extern void BfvComponentNttInplace(GoUint64 parameter_handle, long unsigned int* coeff, GoInt lvl_idx);
-extern void BfvComponentInvNttInplace(GoUint64 parameter_handle, long unsigned int* coeff, GoInt lvl_idx);
-extern void CkksComponentNttInplace(GoUint64 parameter_handle, long unsigned int* coeff, GoInt lvl_idx);
-extern void CkksComponentInvNttInplace(GoUint64 parameter_handle, long unsigned int* coeff, GoInt lvl_idx);
-extern void BfvComponentMulByPow2Inplace(GoUint64 parameter_handle, long unsigned int* coeff, GoInt lvl_idx, GoInt pow2);
-extern void CkksComponentMulByPow2Inplace(GoUint64 parameter_handle, long unsigned int* coeff, GoInt lvl_idx, GoInt pow2);
+extern void BfvComponentNttInplace(GoUint64 parameter_handle, uint64_t* coeff, GoInt lvl_idx);
+extern void BfvComponentInvNttInplace(GoUint64 parameter_handle, uint64_t* coeff, GoInt lvl_idx);
+extern void CkksComponentNttInplace(GoUint64 parameter_handle, uint64_t* coeff, GoInt lvl_idx);
+extern void CkksComponentInvNttInplace(GoUint64 parameter_handle, uint64_t* coeff, GoInt lvl_idx);
+extern void BfvComponentMulByPow2Inplace(GoUint64 parameter_handle, uint64_t* coeff, GoInt lvl_idx, GoInt pow2);
+extern void CkksComponentMulByPow2Inplace(GoUint64 parameter_handle, uint64_t* coeff, GoInt lvl_idx, GoInt pow2);
 extern GoUint64 CreateRandomDBfvContext(GoUint64 context_handle, GoUint8* crs_seed, GoFloat64 sigma_smudging);
 extern GoUint64 GetDBfvBfvContext(GoUint64 context_handle);
 extern GoUint64 CreateCKGContext(GoUint64 context_handle);
