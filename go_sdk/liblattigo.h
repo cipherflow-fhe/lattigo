@@ -288,6 +288,7 @@ extern GoUint64 CkksPolyEvalStepFunction(GoUint64 context_handle, GoUint64 x_cip
 extern GoUint64 PolyEvalFunction(void* f, GoUint64 context_handle, GoUint64 x_ciphertext_handle, GoFloat64 left, GoFloat64 right, GoInt degree);
 extern GoUint64 PolyEvalReluFunction(GoUint64 context_handle, GoUint64 x_ciphertext_handle, GoFloat64 left, GoFloat64 right, GoInt degree);
 extern GoUint64 CreateCkksBtpParameter();
+extern GoUint64 CreateCkksBtpParameterByPreset(int preset);
 extern GoUint64 CreateCkksToyBtpParameter();
 extern GoUint64 GetCkksParameterFromBtpParameter(GoUint64 parameter_handle);
 extern GoUint64 CreateRandomCkksBtpContext(GoUint64 parameter_handle);

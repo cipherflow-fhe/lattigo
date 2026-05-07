@@ -27,11 +27,51 @@ type CkksBtpContext struct {
 	bootstrapper  *bootstrapping.Bootstrapper
 }
 
+// BtpParameterPreset defines available bootstrapping parameter presets.
+type BtpParameterPreset int
+
+const (
+	BtpPresetSparse0 BtpParameterPreset = iota // N16QP1546H192H32
+	BtpPresetSparse1                           // N16QP1547H192H32
+	BtpPresetSparse2                           // N16QP1553H192H32
+	BtpPresetSparse3                           // N15QP768H192H32
+	BtpPresetDense0                            // N16QP1767H32768H32
+	BtpPresetDense1                            // N16QP1788H32768H32
+	BtpPresetDense2                            // N16QP1793H32768H32
+	BtpPresetDense3                            // N15QP880H16384H32
+)
+
+func getPresetParams(preset BtpParameterPreset) (ckks.ParametersLiteral, bootstrapping.Parameters) {
+	switch preset {
+	case BtpPresetSparse0:
+		return bootstrapping.N16QP1546H192H32.SchemeParams, bootstrapping.N16QP1546H192H32.BootstrappingParams
+	case BtpPresetSparse1:
+		return bootstrapping.N16QP1547H192H32.SchemeParams, bootstrapping.N16QP1547H192H32.BootstrappingParams
+	case BtpPresetSparse2:
+		return bootstrapping.N16QP1553H192H32.SchemeParams, bootstrapping.N16QP1553H192H32.BootstrappingParams
+	case BtpPresetSparse3:
+		return bootstrapping.N15QP768H192H32.SchemeParams, bootstrapping.N15QP768H192H32.BootstrappingParams
+	case BtpPresetDense0:
+		return bootstrapping.N16QP1767H32768H32.SchemeParams, bootstrapping.N16QP1767H32768H32.BootstrappingParams
+	case BtpPresetDense1:
+		return bootstrapping.N16QP1788H32768H32.SchemeParams, bootstrapping.N16QP1788H32768H32.BootstrappingParams
+	case BtpPresetDense2:
+		return bootstrapping.N16QP1793H32768H32.SchemeParams, bootstrapping.N16QP1793H32768H32.BootstrappingParams
+	case BtpPresetDense3:
+		return bootstrapping.N15QP880H16384H32.SchemeParams, bootstrapping.N15QP880H16384H32.BootstrappingParams
+	default:
+		return bootstrapping.N16QP1546H192H32.SchemeParams, bootstrapping.N16QP1546H192H32.BootstrappingParams
+	}
+}
+
 //export CreateCkksBtpParameter
 func CreateCkksBtpParameter() uint64 {
-	literal := bootstrapping.N16QP1546H192H32
-	ckks_params := literal.SchemeParams
-	btpParams := literal.BootstrappingParams
+	return CreateCkksBtpParameterByPreset(C.int(BtpPresetSparse0))
+}
+
+//export CreateCkksBtpParameterByPreset
+func CreateCkksBtpParameterByPreset(preset C.int) uint64 {
+	ckks_params, btpParams := getPresetParams(BtpParameterPreset(preset))
 
 	params, err := ckks.NewParametersFromLiteral(ckks_params)
 	if err != nil {
