@@ -19,7 +19,6 @@ type PublicKey = CiphertextQP
 // SwitchingKey is a type for generic RLWE public switching keys.
 type SwitchingKey struct {
 	GadgetCiphertext
-	NMFormBits int
 }
 
 // RelinearizationKey is a type for generic RLWE public relinearization keys. It stores a slice with a
@@ -138,7 +137,6 @@ func NewSwitchingKey(params Parameters, levelQ, levelP int) *SwitchingKey {
 			params.DecompRNS(levelQ, levelP),
 			params.DecompPw2(levelQ, levelP),
 			*params.RingQP()),
-		NMFormBits: 64,
 	}
 }
 
@@ -151,7 +149,6 @@ func (swk *SwitchingKey) Equals(other *SwitchingKey) bool {
 func (swk *SwitchingKey) CopyNew() *SwitchingKey {
 	return &SwitchingKey{
 		GadgetCiphertext: *swk.GadgetCiphertext.CopyNew(),
-		NMFormBits:       swk.NMFormBits,
 	}
 }
 
@@ -251,5 +248,4 @@ func (swk *SwitchingKey) Decompress(params *Parameters) {
 			swk.Value[i][j].Decompress(params)
 		}
 	}
-	swk.NMFormBits = 64
 }
