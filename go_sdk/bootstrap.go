@@ -70,6 +70,16 @@ func GetCkksParameterFromBtpParameter(parameter_handle uint64) uint64 {
 	return id
 }
 
+//export SetCkksParameterLogSlots
+func SetCkksParameterLogSlots(parameter_handle uint64, logSlots int32) {
+	p := get_object[ckks.Parameters](parameter_handle)
+	newParams, err := ckks.NewParameters(p.Parameters, int(logSlots), p.DefaultScale())
+	if err != nil {
+		panic(err)
+	}
+	*p = newParams
+}
+
 //export CreateRandomCkksBtpContext
 func CreateRandomCkksBtpContext(parameter_handle uint64) uint64 {
 	param := get_object[BtpParameterSet](parameter_handle)
@@ -378,17 +388,11 @@ func SerializeCkksBtpContextAdvanced(context_handle uint64, raw_data **byte, len
 	var data_slice []byte
 	writer := new(bytes.Buffer)
 
-	// Pre-allocate to avoid repeated realloc during writes.
-	// Rtks dominates: nKeys * decomp * (levelQ+levelP) * N * bitLen/8 bytes for c0 only (c1 is stored as seed).
-	if context.evk != nil && context.evk.Rtks != nil {
-		nKeys := len(context.evk.Rtks.Keys)
-		levelQ := context.parameter.QCount()
-		levelP := context.parameter.PCount()
-		decomp := context.parameter.DecompRNS(levelQ-1, levelP-1)
-		// Each coefficient is ~60 bits on average; use 8 bytes as upper bound per uint64.
-		bytesPerKey := context.parameter.N() * (levelQ + levelP) * decomp * 8
-		writer.Grow(nKeys * bytesPerKey)
-	}
+	// 64 MB floor: skips ~20 early reallocations for production contexts
+	// without the OOM risk of a formula-based upper bound (sparse BTP at
+	// N=2^16 × ~100 rotation keys computes ~7.8 GB, which can fail on
+	// constrained hosts).
+	writer.Grow(64 * 1024 * 1024)
 
 	param_data, _ := context.parameter.MarshalBinary()
 	binary.Write(writer, binary.LittleEndian, uint32(len(param_data)))
