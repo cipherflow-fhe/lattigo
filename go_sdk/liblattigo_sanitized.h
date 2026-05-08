@@ -39,10 +39,6 @@ typedef struct { const char *p; ptrdiff_t n; } _GoString_;
 
 
 
-#line 3 "conversion.go"
-
-
-
 
 #line 3 "multiparty.go"
 
@@ -111,6 +107,7 @@ extern GoUint64 CreateBfvParameterV2(GoUint64 T);
 extern GoUint64 CreateCkksParameterV2();
 extern GoUint64 SetBfvParameter(GoUint64 N, GoUint64 T, uint64_t* Q, GoInt q_len, uint64_t* P, GoInt p_len);
 extern GoUint64 SetCkksParameter(GoUint64 N, uint64_t* Q, GoInt q_len, uint64_t* P, GoInt p_len);
+extern GoUint64 SetCkksParameterLogSlots(GoUint64 param_handle, GoInt log_slots);
 extern GoUint64 CopyBfvParameter(GoUint64 parameter_handle);
 extern GoUint64 CopyCkksParameter(GoUint64 parameter_handle);
 extern void PrintBfvParameter(GoUint64 parameter_handle);
@@ -128,6 +125,7 @@ extern GoInt GetCkksMaxLevel(GoUint64 parameter_handle);
 extern GoUint64 GetCkksP(GoUint64 parameter_handle, GoInt index);
 extern GoInt GetCkksPCount(GoUint64 parameter_handle);
 extern GoUint64 GetCkksQ(GoUint64 parameter_handle, GoInt index);
+extern GoInt GetCkksLogSlots(GoUint64 parameter_handle);
 extern GoFloat64 GetDefaultScale(GoUint64 parameter_handle);
 extern GoUint64 CreateEmptyBfvContext(GoUint64 parameter_handle);
 extern GoUint64 CreateRandomBfvContext(GoUint64 parameter_handle, GoInt level);
@@ -291,6 +289,7 @@ extern GoUint64 PolyEvalReluFunction(GoUint64 context_handle, GoUint64 x_ciphert
 extern GoUint64 CreateCkksBtpParameter();
 extern GoUint64 CreateCkksToyBtpParameter();
 extern GoUint64 GetCkksParameterFromBtpParameter(GoUint64 parameter_handle);
+extern GoUint64 SetCkksBtpParameterLogSlots(GoUint64 param_handle, GoInt log_slots);
 extern GoUint64 CreateRandomCkksBtpContext(GoUint64 parameter_handle);
 extern void GenCkksBtpContextRotationKeys(GoUint64 context_handle);
 extern void GenCkksBtpContextRotationKeysForRotations(GoUint64 context_handle, GoInt32* rots, GoInt rots_length, GoUint8 include_swap_rows);
