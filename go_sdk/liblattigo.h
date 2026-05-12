@@ -12,6 +12,8 @@
 
 #ifndef GO_CGO_GOSTRING_TYPEDEF
 typedef struct { const char *p; ptrdiff_t n; } _GoString_;
+extern size_t _GoStringLen(_GoString_ s);
+extern const char *_GoStringPtr(_GoString_ s);
 #endif
 
 #endif
@@ -70,9 +72,15 @@ typedef size_t GoUintptr;
 typedef float GoFloat32;
 typedef double GoFloat64;
 #ifdef _MSC_VER
+#if !defined(__cplusplus) || _MSVC_LANG <= 201402L
 #include <complex.h>
 typedef _Fcomplex GoComplex64;
 typedef _Dcomplex GoComplex128;
+#else
+#include <complex>
+typedef std::complex<float> GoComplex64;
+typedef std::complex<double> GoComplex128;
+#endif
 #else
 typedef float _Complex GoComplex64;
 typedef double _Complex GoComplex128;
@@ -100,11 +108,11 @@ typedef struct { void *data; GoInt len; GoInt cap; } GoSlice;
 extern "C" {
 #endif
 
-extern char* GetErrorMessage();
+extern char* GetErrorMessage(void);
 extern GoUint64 CreateBfvParameter(GoUint64 N, GoUint64 T);
 extern GoUint64 CreateCkksParameter(GoUint64 N);
 extern GoUint64 CreateBfvParameterV2(GoUint64 T);
-extern GoUint64 CreateCkksParameterV2();
+extern GoUint64 CreateCkksParameterV2(void);
 extern GoUint64 SetBfvParameter(GoUint64 N, GoUint64 T, uint64_t* Q, GoInt q_len, uint64_t* P, GoInt p_len);
 extern GoUint64 SetCkksParameter(GoUint64 N, uint64_t* Q, GoInt q_len, uint64_t* P, GoInt p_len);
 extern GoUint64 CopyBfvParameter(GoUint64 parameter_handle);
@@ -280,12 +288,12 @@ extern GoUint64 NewCkksCiphertext(GoUint64 context_handle, GoInt degree, GoInt l
 extern void PrintCkksCiphertext(GoUint64 x_ciphertext_handle);
 extern void PrintBfvCiphertext(GoUint64 x_ciphertext_handle);
 extern void PrintBfvPlaintext(GoUint64 x_plaintext_handle);
-extern void PrintMemUsage();
+extern void PrintMemUsage(void);
 extern GoUint64 CkksPolyEvalStepFunction(GoUint64 context_handle, GoUint64 x_ciphertext_handle, GoFloat64 a, GoFloat64 b, GoInt degree, GoFloat64 threshold);
 extern GoUint64 PolyEvalFunction(void* f, GoUint64 context_handle, GoUint64 x_ciphertext_handle, GoFloat64 left, GoFloat64 right, GoInt degree);
 extern GoUint64 PolyEvalReluFunction(GoUint64 context_handle, GoUint64 x_ciphertext_handle, GoFloat64 left, GoFloat64 right, GoInt degree);
-extern GoUint64 CreateCkksBtpParameter();
-extern GoUint64 CreateCkksToyBtpParameter();
+extern GoUint64 CreateCkksBtpParameter(void);
+extern GoUint64 CreateCkksToyBtpParameter(void);
 extern GoUint64 GetCkksParameterFromBtpParameter(GoUint64 parameter_handle);
 extern GoUint64 CreateRandomCkksBtpContext(GoUint64 parameter_handle);
 extern void GenCkksBtpContextRotationKeys(GoUint64 context_handle);
