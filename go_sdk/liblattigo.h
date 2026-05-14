@@ -39,6 +39,10 @@ typedef struct { const char *p; ptrdiff_t n; } _GoString_;
 
 #line 1 "cgo-generated-wrapper"
 
+#line 3 "conversion.go"
+ #include <stdint.h>
+
+#line 1 "cgo-generated-wrapper"
 
 #line 3 "multiparty.go"
 
