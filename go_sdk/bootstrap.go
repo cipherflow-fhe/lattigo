@@ -70,6 +70,18 @@ func GetCkksParameterFromBtpParameter(parameter_handle uint64) uint64 {
 	return id
 }
 
+//export SetCkksBtpParameterLogSlots
+func SetCkksBtpParameterLogSlots(param_handle uint64, log_slots int) uint64 {
+	btp_param := get_object[BtpParameterSet](param_handle)
+	new_scheme_param, err := ckks.NewParameters(btp_param.SchemeParam.Parameters, log_slots, btp_param.SchemeParam.DefaultScale())
+	if err != nil {
+		panic(err)
+	}
+	btp_param.SchemeParam = new_scheme_param
+	delete_object(param_handle)
+	return insert_object(btp_param)
+}
+
 //export CreateRandomCkksBtpContext
 func CreateRandomCkksBtpContext(parameter_handle uint64) uint64 {
 	param := get_object[BtpParameterSet](parameter_handle)

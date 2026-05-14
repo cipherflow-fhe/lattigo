@@ -268,6 +268,17 @@ func SetCkksParameter(N uint64, Q *C.uint64_t, q_len int, P *C.uint64_t, p_len i
 	return id
 }
 
+//export SetCkksParameterLogSlots
+func SetCkksParameterLogSlots(param_handle uint64, log_slots int) uint64 {
+	old_param := get_object[ckks.Parameters](param_handle)
+	new_param, err := ckks.NewParameters(old_param.Parameters, log_slots, old_param.DefaultScale())
+	if err != nil {
+		panic(err)
+	}
+	delete_object(param_handle)
+	return insert_object(&new_param)
+}
+
 //export CopyBfvParameter
 func CopyBfvParameter(parameter_handle uint64) uint64 {
 	param := get_object[bfv.Parameters](parameter_handle)
@@ -391,6 +402,12 @@ func GetCkksPCount(parameter_handle uint64) int {
 func GetCkksQ(parameter_handle uint64, index int) uint64 {
 	param := get_object[ckks.Parameters](parameter_handle)
 	return param.Q()[index]
+}
+
+//export GetCkksLogSlots
+func GetCkksLogSlots(parameter_handle uint64) int {
+	param := get_object[ckks.Parameters](parameter_handle)
+	return param.LogSlots()
 }
 
 //export GetDefaultScale
@@ -1990,7 +2007,7 @@ func CkksEncode(context_handle uint64, message_array *C.double, mg_len int, leve
 	// Create a slice corresponding to the C array so that it can be indexed
 	slice := unsafe.Slice((*float64)(message_array), mg_len)
 	plaintext := ckks.NewPlaintext(*context.parameter, level, scale)
-	context.encoder.EncodeSlots(slice, plaintext, context.parameter.LogN()-1)
+	context.encoder.EncodeSlots(slice, plaintext, context.parameter.LogSlots())
 
 	id := insert_object(plaintext)
 	return id
@@ -2007,7 +2024,7 @@ func CkksEncodeComplex(context_handle uint64, message_array *C.double, mg_len in
 		message[i] = complex(slice[i*2], slice[i*2+1])
 	}
 	plaintext := ckks.NewPlaintext(*context.parameter, level, scale)
-	context.encoder.EncodeSlots(message, plaintext, context.parameter.LogN()-1)
+	context.encoder.EncodeSlots(message, plaintext, context.parameter.LogSlots())
 
 	id := insert_object(plaintext)
 	return id
@@ -2019,7 +2036,7 @@ func CkksEncodeRingt(context_handle uint64, message_array *C.double, mg_len int,
 
 	slice := unsafe.Slice((*float64)(message_array), mg_len)
 	plaintext := ckks.NewPlaintextRingT(*context.parameter, scale)
-	context.encoder.EncodeRingT(slice, plaintext, context.parameter.LogN()-1)
+	context.encoder.EncodeRingT(slice, plaintext, context.parameter.LogSlots())
 
 	id := insert_object(plaintext)
 	return id
@@ -2035,7 +2052,7 @@ func CkksEncodeRingtComplex(context_handle uint64, message_array *C.double, mg_l
 		message[i] = complex(slice[i*2], slice[i*2+1])
 	}
 	plaintext := ckks.NewPlaintextRingT(*context.parameter, scale)
-	context.encoder.EncodeRingT(message, plaintext, context.parameter.LogN()-1)
+	context.encoder.EncodeRingT(message, plaintext, context.parameter.LogSlots())
 
 	id := insert_object(plaintext)
 	return id
@@ -2156,7 +2173,7 @@ func BfvDecodeCoeffs(context_handle uint64, plaintext_handle uint64, raw_data **
 func CkksDecode(context_handle uint64, plaintext_handle uint64, raw_data **C.double, length *C.uint64_t) uint64 {
 	context := get_ckks_context(context_handle)
 	plaintext := get_object[ckks.Plaintext](plaintext_handle)
-	message := context.encoder.DecodeSlots(plaintext, context.parameter.LogN()-1)
+	message := context.encoder.DecodeSlots(plaintext, context.parameter.LogSlots())
 
 	*raw_data = (*C.double)(unsafe.Pointer(&message[0]))
 	*length = (C.uint64_t)(len(message))

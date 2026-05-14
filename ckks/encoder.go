@@ -65,8 +65,8 @@ type Encoder interface {
 	DecodeCoeffs(plaintext *Plaintext) (res []float64)
 	DecodeCoeffsPublic(plaintext *Plaintext, bound float64) (res []float64)
 
-	RingTToMul(ptRt *PlaintextRingT, ptmul *PlaintextMul)
-	RingTToPt(ptRt *PlaintextRingT, ptmul *Plaintext)
+	RingTToMul(ptRt *PlaintextRingT, ptMul *PlaintextMul)
+	RingTToPt(ptRt *PlaintextRingT, pt *Plaintext)
 
 	// Utility
 	Embed(values interface{}, logSlots int, scale float64, montgomery bool, polyOut interface{})
@@ -173,13 +173,60 @@ func NewEncoder(params Parameters) Encoder {
 
 func (ecd *encoderComplex128) RingTToMul(ptRt *PlaintextRingT, ptMul *PlaintextMul) {
 	level := ptMul.Level()
+	bredParams := ecd.params.RingQ().BredParams
+	Q := ecd.params.RingQ().Modulus
 
-	// Reuse RingTToPt logic - ptMul is compatible with Plaintext
-	tempPt := (*Plaintext)(ptMul)
-	ecd.RingTToPt(ptRt, tempPt)
+	serialize_data_bit_length_from_ckks_param := func(param Parameters) int {
+		primes := append(param.Q(), param.P()...)
+		sort.Slice(primes, func(i, j int) bool { return primes[i] < primes[j] })
+		return bits.Len64(primes[len(primes)-1])
+	}
 
-	// Add Montgomery form that RingTToPt doesn't do
-	ecd.params.RingQ().MFormLvl(level, ptMul.Value, ptMul.Value)
+	if ecd.params.IsFpga {
+		data_bit_length := serialize_data_bit_length_from_ckks_param(ecd.params)
+		var is_negative_pos int
+		var mask uint64
+		if data_bit_length <= 32 {
+			is_negative_pos = 31
+			mask = 0x7fffffff
+		} else {
+			is_negative_pos = 63
+			mask = 0x7fffffffffffffff
+		}
+
+		for i := 0; i < level+1; i++ {
+			for j := 0; j < len(ptMul.Value.Coeffs[0]); j++ {
+				c := ptRt.Value.Coeffs[0][j]
+				IsNegative := (c >> uint64(is_negative_pos)) & 0x1
+				c = c & mask
+				c = uint64(float64(c) * (1 << (32 - 26)))
+
+				if IsNegative == 1 {
+					if c > Q[i] {
+						ptMul.Value.Coeffs[i][j] = Q[i] - ring.BRedAdd(c, Q[i], bredParams[i])
+					} else {
+						ptMul.Value.Coeffs[i][j] = Q[i] - c
+					}
+				} else {
+					if c > Q[i] {
+						ptMul.Value.Coeffs[i][j] = ring.BRedAdd(c, Q[i], bredParams[i])
+					} else {
+						ptMul.Value.Coeffs[i][j] = c
+					}
+				}
+			}
+		}
+	} else {
+		ringQ0, err := ring.NewRing(ecd.params.N(), ecd.params.RingQ().Modulus[:1])
+		if err != nil {
+			panic(err.Error())
+		}
+		basisExtender := ring.NewBasisExtender(ringQ0, ecd.params.RingQ())
+		basisExtender.ModUpQtoP(0, level, ptRt.Value, ptMul.Value)
+
+	}
+
+	NttAndMontgomeryLvl(ptMul.Level(), ecd.params.logSlots, ecd.params.RingQ(), true, ptMul.Value)
 }
 
 func (ecd *encoderComplex128) RingTToPt(ptRt *PlaintextRingT, pt *Plaintext) {
