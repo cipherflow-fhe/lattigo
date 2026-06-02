@@ -191,6 +191,8 @@ extern GoUint64 SerializeBfvCiphertext(GoUint64 ciphertext_handle, GoUint64 para
 extern GoUint64 SerializeBfvCompressedCiphertext(GoUint64 ciphertext_handle, GoUint64 param_handle, GoUint8** raw_data, uint64_t* length);
 extern GoUint64 SerializeCkksCiphertext(GoUint64 ciphertext_handle, GoUint64 param_handle, GoUint8** raw_data, uint64_t* length);
 extern GoUint64 SerializeCkksCompressedCiphertext(GoUint64 ciphertext_handle, GoUint64 param_handle, GoUint8** raw_data, uint64_t* length);
+extern GoUint64 SerializeBfvPlaintextRingt(GoUint64 plaintext_handle, GoUint8** raw_data, uint64_t* length);
+extern GoUint64 DeserializeBfvPlaintextRingt(GoUint8* raw_data, uint64_t length);
 extern GoUint64 DeserializeBfvCiphertext(GoUint8* raw_data, uint64_t length);
 extern GoUint64 DeserializeBfvCompressedCiphertext(GoUint8* raw_data, uint64_t length);
 extern GoUint64 DeserializeCkksCiphertext(GoUint8* raw_data, uint64_t length);

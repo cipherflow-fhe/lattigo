@@ -20,6 +20,7 @@ import (
 
 	"github.com/cipherflow-fhe/lattigo/bfv"
 	"github.com/cipherflow-fhe/lattigo/ckks"
+	"github.com/cipherflow-fhe/lattigo/ring"
 	"github.com/cipherflow-fhe/lattigo/rlwe"
 	"github.com/cipherflow-fhe/lattigo/rlwe/ringqp"
 )
@@ -1758,6 +1759,34 @@ func SerializeCkksCompressedCiphertext(ciphertext_handle uint64, param_handle ui
 	*raw_data = (*byte)(unsafe.Pointer(&data_slice[0]))
 	*length = (C.uint64_t)(len(data_slice))
 	id := insert_object(&data_slice)
+	return id
+}
+
+//export SerializeBfvPlaintextRingt
+func SerializeBfvPlaintextRingt(plaintext_handle uint64, raw_data **byte, length *C.uint64_t) uint64 {
+	plaintext := get_object[bfv.PlaintextRingT](plaintext_handle)
+	data_slice, err := plaintext.Value.MarshalBinary()
+	if err != nil {
+		panic(err)
+	}
+
+	*raw_data = (*byte)(unsafe.Pointer(&data_slice[0]))
+	*length = (C.uint64_t)(len(data_slice))
+	id := insert_object(&data_slice)
+	return id
+}
+
+//export DeserializeBfvPlaintextRingt
+func DeserializeBfvPlaintextRingt(raw_data *byte, length C.uint64_t) uint64 {
+	data_slice := unsafe.Slice(raw_data, length)
+	plaintext := new(bfv.PlaintextRingT)
+	plaintext.Plaintext = new(rlwe.Plaintext)
+	plaintext.Value = new(ring.Poly)
+	if err := plaintext.Value.UnmarshalBinary(data_slice); err != nil {
+		panic(err)
+	}
+
+	id := insert_object(plaintext)
 	return id
 }
 
