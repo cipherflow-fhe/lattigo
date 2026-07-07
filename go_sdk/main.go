@@ -2570,6 +2570,24 @@ func CkksNegate(context_handle uint64, x0_ciphertext_handle uint64) uint64 {
 	return id
 }
 
+//export CkksMultByi
+func CkksMultByi(context_handle uint64, x_ciphertext_handle uint64) uint64 {
+	context := get_ckks_context(context_handle)
+	x_ciphertext := get_object[ckks.Ciphertext](x_ciphertext_handle)
+	y_ciphertext := context.evaluator.MultByiNew(x_ciphertext)
+	id := insert_object(y_ciphertext)
+	return id
+}
+
+//export CkksDivByi
+func CkksDivByi(context_handle uint64, x_ciphertext_handle uint64) uint64 {
+	context := get_ckks_context(context_handle)
+	x_ciphertext := get_object[ckks.Ciphertext](x_ciphertext_handle)
+	y_ciphertext := context.evaluator.DivByiNew(x_ciphertext)
+	id := insert_object(y_ciphertext)
+	return id
+}
+
 //export BfvMult
 func BfvMult(context_handle uint64, x0_ciphertext_handle uint64, x1_ciphertext_handle uint64) uint64 {
 	context := get_object[BfvContext](context_handle)

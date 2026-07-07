@@ -265,6 +265,8 @@ extern GoUint64 CkksSubPlain(GoUint64 context_handle, GoUint64 x0_ciphertext_han
 extern GoUint64 CkksAddPlainRingt(GoUint64 context_handle, GoUint64 x0_ciphertext_handle, GoUint64 x1_plaintext_handle);
 extern GoUint64 CkksSubPlainRingt(GoUint64 context_handle, GoUint64 x0_ciphertext_handle, GoUint64 x1_plaintext_handle);
 extern GoUint64 CkksNegate(GoUint64 context_handle, GoUint64 x0_ciphertext_handle);
+extern GoUint64 CkksMultByi(GoUint64 context_handle, GoUint64 x_ciphertext_handle);
+extern GoUint64 CkksDivByi(GoUint64 context_handle, GoUint64 x_ciphertext_handle);
 extern GoUint64 BfvMult(GoUint64 context_handle, GoUint64 x0_ciphertext_handle, GoUint64 x1_ciphertext_handle);
 extern GoUint64 CkksMult(GoUint64 context_handle, GoUint64 x0_ciphertext_handle, GoUint64 x1_ciphertext_handle);
 extern GoUint64 BfvMultPlain(GoUint64 context_handle, GoUint64 x0_ciphertext_handle, GoUint64 x1_plaintext_handle);
