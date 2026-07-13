@@ -3,108 +3,77 @@ package main
 // #include <stdint.h>
 import "C"
 import (
-	"unsafe"
-
 	"github.com/cipherflow-fhe/lattigo/bfv"
 	"github.com/cipherflow-fhe/lattigo/ckks"
 	"github.com/cipherflow-fhe/lattigo/ring"
 )
 
-//export BfvComponentNttInplace
-func BfvComponentNttInplace(parameter_handle uint64, coeff *C.uint64_t, lvl_idx int) {
+func qp_poly_views(data *C.uint64_t, ring_degree int, level_q int, level_p int) (*ring.Poly, *ring.Poly) {
+	q_size := level_q + 1
+	q_poly := poly_view_from_flat_rns(data, q_size, ring_degree)
+	if level_p < 0 {
+		return q_poly, nil
+	}
+	p_poly := poly_view_from_flat_rns(uint64_ptr_at(data, q_size*ring_degree), level_p+1, ring_degree)
+	return q_poly, p_poly
+}
+
+//export BfvPolyNttInplace
+func BfvPolyNttInplace(parameter_handle uint64, data *C.uint64_t, level_q int, level_p int) {
 	param := get_object[bfv.Parameters](parameter_handle)
-	ringq := param.RingQ()
-	data_slice := unsafe.Slice((*uint64)(unsafe.Pointer(coeff)), ringq.N)
-
-	if lvl_idx < param.QCount() {
-		ring.NTT(data_slice, data_slice, ringq.N, ringq.NttPsi[lvl_idx], ringq.Modulus[lvl_idx], ringq.MredParams[lvl_idx], ringq.BredParams[lvl_idx])
-	} else {
-		ringp := param.RingP()
-		sp_lvl_idx := lvl_idx - param.QCount()
-		ring.NTT(data_slice, data_slice, ringp.N, ringp.NttPsi[sp_lvl_idx], ringp.Modulus[sp_lvl_idx], ringp.MredParams[sp_lvl_idx], ringp.BredParams[sp_lvl_idx])
+	q_poly, p_poly := qp_poly_views(data, param.RingQ().N, level_q, level_p)
+	param.RingQ().NTTLvl(level_q, q_poly, q_poly)
+	if p_poly != nil {
+		param.RingP().NTTLvl(level_p, p_poly, p_poly)
 	}
-
 }
 
-//export BfvComponentInvNttInplace
-func BfvComponentInvNttInplace(parameter_handle uint64, coeff *C.uint64_t, lvl_idx int) {
+//export BfvPolyInvNttInplace
+func BfvPolyInvNttInplace(parameter_handle uint64, data *C.uint64_t, level_q int, level_p int) {
 	param := get_object[bfv.Parameters](parameter_handle)
-	ringq := param.RingQ()
-	data_slice := unsafe.Slice((*uint64)(unsafe.Pointer(coeff)), ringq.N)
-
-	if lvl_idx < param.QCount() {
-		ring.InvNTT(data_slice, data_slice, ringq.N, ringq.NttPsiInv[lvl_idx], ringq.NttNInv[lvl_idx], ringq.Modulus[lvl_idx], ringq.MredParams[lvl_idx])
-	} else {
-		ringp := param.RingP()
-		sp_lvl_idx := lvl_idx - param.QCount()
-		ring.InvNTT(data_slice, data_slice, ringp.N, ringp.NttPsiInv[sp_lvl_idx], ringp.NttNInv[sp_lvl_idx], ringp.Modulus[sp_lvl_idx], ringp.MredParams[sp_lvl_idx])
+	q_poly, p_poly := qp_poly_views(data, param.RingQ().N, level_q, level_p)
+	param.RingQ().InvNTTLvl(level_q, q_poly, q_poly)
+	if p_poly != nil {
+		param.RingP().InvNTTLvl(level_p, p_poly, p_poly)
 	}
 }
 
-//export CkksComponentNttInplace
-func CkksComponentNttInplace(parameter_handle uint64, coeff *C.uint64_t, lvl_idx int) {
-	param := get_object[ckks.Parameters](parameter_handle)
-	ringq := param.RingQ()
-	data_slice := unsafe.Slice((*uint64)(unsafe.Pointer(coeff)), ringq.N)
-
-	if lvl_idx < param.QCount() {
-		ring.NTT(data_slice, data_slice, ringq.N, ringq.NttPsi[lvl_idx], ringq.Modulus[lvl_idx], ringq.MredParams[lvl_idx], ringq.BredParams[lvl_idx])
-	} else {
-		ringp := param.RingP()
-		sp_lvl_idx := lvl_idx - param.QCount()
-		ring.NTT(data_slice, data_slice, ringp.N, ringp.NttPsi[sp_lvl_idx], ringp.Modulus[sp_lvl_idx], ringp.MredParams[sp_lvl_idx], ringp.BredParams[sp_lvl_idx])
-	}
-
-}
-
-//export CkksComponentInvNttInplace
-func CkksComponentInvNttInplace(parameter_handle uint64, coeff *C.uint64_t, lvl_idx int) {
-	param := get_object[ckks.Parameters](parameter_handle)
-	ringq := param.RingQ()
-	data_slice := unsafe.Slice((*uint64)(unsafe.Pointer(coeff)), ringq.N)
-
-	if lvl_idx < param.QCount() {
-		ring.InvNTT(data_slice, data_slice, ringq.N, ringq.NttPsiInv[lvl_idx], ringq.NttNInv[lvl_idx], ringq.Modulus[lvl_idx], ringq.MredParams[lvl_idx])
-	} else {
-		ringp := param.RingP()
-		sp_lvl_idx := lvl_idx - param.QCount()
-		ring.InvNTT(data_slice, data_slice, ringp.N, ringp.NttPsiInv[sp_lvl_idx], ringp.NttNInv[sp_lvl_idx], ringp.Modulus[sp_lvl_idx], ringp.MredParams[sp_lvl_idx])
-	}
-}
-
-//export BfvComponentMulByPow2Inplace
-func BfvComponentMulByPow2Inplace(parameter_handle uint64, coeff *C.uint64_t, lvl_idx int, pow2 int) {
+//export BfvPolyMulByPow2Inplace
+func BfvPolyMulByPow2Inplace(parameter_handle uint64, data *C.uint64_t, level_q int, level_p int, pow2 int) {
 	param := get_object[bfv.Parameters](parameter_handle)
-	ringq := param.RingQ()
-	data_slice := unsafe.Slice((*uint64)(unsafe.Pointer(coeff)), ringq.N)
-
-	if lvl_idx < param.QCount() {
-		ring.MFormVec(data_slice, data_slice, ringq.Modulus[lvl_idx], ringq.BredParams[lvl_idx])
-		ring.MulByPow2Vec(data_slice, data_slice, pow2, ringq.Modulus[lvl_idx], ringq.MredParams[lvl_idx])
-	} else {
-		ringp := param.RingP()
-		sp_lvl_idx := lvl_idx - param.QCount()
-		ring.MFormVec(data_slice, data_slice, ringp.Modulus[sp_lvl_idx], ringp.BredParams[sp_lvl_idx])
-		ring.MulByPow2Vec(data_slice, data_slice, pow2, ringp.Modulus[sp_lvl_idx], ringp.MredParams[sp_lvl_idx])
+	q_poly, p_poly := qp_poly_views(data, param.RingQ().N, level_q, level_p)
+	param.RingQ().MulByPow2Lvl(level_q, q_poly, pow2, q_poly)
+	if p_poly != nil {
+		param.RingP().MulByPow2Lvl(level_p, p_poly, pow2, p_poly)
 	}
-
 }
 
-//export CkksComponentMulByPow2Inplace
-func CkksComponentMulByPow2Inplace(parameter_handle uint64, coeff *C.uint64_t, lvl_idx int, pow2 int) {
+//export CkksPolyNttInplace
+func CkksPolyNttInplace(parameter_handle uint64, data *C.uint64_t, level_q int, level_p int) {
 	param := get_object[ckks.Parameters](parameter_handle)
-	ringq := param.RingQ()
-	data_slice := unsafe.Slice((*uint64)(unsafe.Pointer(coeff)), ringq.N)
-
-	if lvl_idx < param.QCount() {
-		ring.MFormVec(data_slice, data_slice, ringq.Modulus[lvl_idx], ringq.BredParams[lvl_idx])
-		ring.MulByPow2Vec(data_slice, data_slice, pow2, ringq.Modulus[lvl_idx], ringq.MredParams[lvl_idx])
-	} else {
-		ringp := param.RingP()
-		sp_lvl_idx := lvl_idx - param.QCount()
-		ring.MFormVec(data_slice, data_slice, ringp.Modulus[sp_lvl_idx], ringp.BredParams[sp_lvl_idx])
-		ring.MulByPow2Vec(data_slice, data_slice, pow2, ringp.Modulus[sp_lvl_idx], ringp.MredParams[sp_lvl_idx])
+	q_poly, p_poly := qp_poly_views(data, param.RingQ().N, level_q, level_p)
+	param.RingQ().NTTLvl(level_q, q_poly, q_poly)
+	if p_poly != nil {
+		param.RingP().NTTLvl(level_p, p_poly, p_poly)
 	}
-
 }
 
+//export CkksPolyInvNttInplace
+func CkksPolyInvNttInplace(parameter_handle uint64, data *C.uint64_t, level_q int, level_p int) {
+	param := get_object[ckks.Parameters](parameter_handle)
+	q_poly, p_poly := qp_poly_views(data, param.RingQ().N, level_q, level_p)
+	param.RingQ().InvNTTLvl(level_q, q_poly, q_poly)
+	if p_poly != nil {
+		param.RingP().InvNTTLvl(level_p, p_poly, p_poly)
+	}
+}
+
+//export CkksPolyMulByPow2Inplace
+func CkksPolyMulByPow2Inplace(parameter_handle uint64, data *C.uint64_t, level_q int, level_p int, pow2 int) {
+	param := get_object[ckks.Parameters](parameter_handle)
+	q_poly, p_poly := qp_poly_views(data, param.RingQ().N, level_q, level_p)
+	param.RingQ().MulByPow2Lvl(level_q, q_poly, pow2, q_poly)
+	if p_poly != nil {
+		param.RingP().MulByPow2Lvl(level_p, p_poly, pow2, p_poly)
+	}
+}
