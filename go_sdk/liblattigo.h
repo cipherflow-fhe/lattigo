@@ -330,7 +330,7 @@ extern void ExportBfvRelinKey(GoUint64 parameter_handle, GoUint64 relin_key_hand
 extern void ExportCkksRelinKey(GoUint64 parameter_handle, GoUint64 relin_key_handle, GoInt level, GoInt key_mf_nbits, CRelinKey* c_relin_key);
 extern void ExportBfvGaloisKey(GoUint64 parameter_handle, GoUint64 galois_key_handle, GoInt level, GoInt key_mf_nbits, CGaloisKey* c_galois_key);
 extern void ExportCkksGaloisKey(GoUint64 parameter_handle, GoUint64 galois_key_handle, GoInt level, GoInt key_mf_nbits, CGaloisKey* c_galois_key);
-extern void ExportCkksSwitchingKey(GoUint64 parameter_handle, GoUint64 switching_key_handle, GoInt level, GoInt sp_level, GoInt key_mf_nbits, CKeySwitchKey* c_switch_key);
+extern void ExportCkksSwitchingKey(GoUint64 parameter_handle, GoUint64 switching_key_handle, GoInt level_q, GoInt level_p, GoInt key_mf_nbits, CSwitchingKey* c_switch_key);
 extern void BfvComponentNttInplace(GoUint64 parameter_handle, uint64_t* coeff, GoInt lvl_idx);
 extern void BfvComponentInvNttInplace(GoUint64 parameter_handle, uint64_t* coeff, GoInt lvl_idx);
 extern void CkksComponentNttInplace(GoUint64 parameter_handle, uint64_t* coeff, GoInt lvl_idx);
