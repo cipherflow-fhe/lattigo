@@ -3,10 +3,10 @@ package lintrans
 import (
 	"fmt"
 
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
-	"github.com/tuneinsight/lattigo/v6/ring/ringqp"
-	"github.com/tuneinsight/lattigo/v6/schemes"
-	"github.com/tuneinsight/lattigo/v6/utils"
+	"github.com/cipherflow-fhe/lattigo/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/ring/ringqp"
+	"github.com/cipherflow-fhe/lattigo/schemes"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 type Evaluator struct {

@@ -5,7 +5,7 @@ import (
 	"math/bits"
 	"unsafe"
 
-	"github.com/tuneinsight/lattigo/v6/utils"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 // AutomorphismNTTIndex computes the look-up table for the automorphism X^{i} -> X^{i*k mod NthRoot}.

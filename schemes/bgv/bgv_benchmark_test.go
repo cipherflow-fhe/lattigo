@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/core/rlwe"
 )
 
 func BenchmarkBGV(b *testing.B) {

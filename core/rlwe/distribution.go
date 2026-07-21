@@ -3,7 +3,7 @@ package rlwe
 import (
 	"math"
 
-	"github.com/tuneinsight/lattigo/v6/ring"
+	"github.com/cipherflow-fhe/lattigo/ring"
 )
 
 type Distribution struct {

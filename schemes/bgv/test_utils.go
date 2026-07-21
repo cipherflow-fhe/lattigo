@@ -8,9 +8,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
-	"github.com/tuneinsight/lattigo/v6/ring"
-	"github.com/tuneinsight/lattigo/v6/utils/sampling"
+	"github.com/cipherflow-fhe/lattigo/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/utils/sampling"
 )
 
 type TestContext struct {

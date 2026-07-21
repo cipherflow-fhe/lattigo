@@ -3,10 +3,10 @@ package ringqp
 import (
 	"testing"
 
-	"github.com/tuneinsight/lattigo/v6/ring"
-	"github.com/tuneinsight/lattigo/v6/utils/buffer"
-	"github.com/tuneinsight/lattigo/v6/utils/sampling"
-	"github.com/tuneinsight/lattigo/v6/utils/structs"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/utils/buffer"
+	"github.com/cipherflow-fhe/lattigo/utils/sampling"
+	"github.com/cipherflow-fhe/lattigo/utils/structs"
 
 	"github.com/stretchr/testify/require"
 )

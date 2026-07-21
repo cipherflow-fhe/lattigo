@@ -1,6 +1,6 @@
 package rlwe
 
-import "github.com/tuneinsight/lattigo/v6/ring"
+import "github.com/cipherflow-fhe/lattigo/ring"
 
 const (
 	// XsUniformTernary is the standard deviation of a ternary key with uniform distribution

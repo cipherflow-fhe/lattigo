@@ -8,13 +8,13 @@ import (
 	"math/big"
 	"slices"
 
-	ltcommon "github.com/tuneinsight/lattigo/v6/circuits/ckks/lintrans"
-	"github.com/tuneinsight/lattigo/v6/circuits/common/lintrans"
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
-	"github.com/tuneinsight/lattigo/v6/ring"
-	"github.com/tuneinsight/lattigo/v6/schemes/ckks"
-	"github.com/tuneinsight/lattigo/v6/utils"
-	"github.com/tuneinsight/lattigo/v6/utils/bignum"
+	ltcommon "github.com/cipherflow-fhe/lattigo/circuits/ckks/lintrans"
+	"github.com/cipherflow-fhe/lattigo/circuits/common/lintrans"
+	"github.com/cipherflow-fhe/lattigo/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/schemes/ckks"
+	"github.com/cipherflow-fhe/lattigo/utils"
+	"github.com/cipherflow-fhe/lattigo/utils/bignum"
 )
 
 // Type is a type used to distinguish between different discrete Fourier transformations.

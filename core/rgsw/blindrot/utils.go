@@ -3,8 +3,8 @@ package blindrot
 import (
 	"math/big"
 
-	"github.com/tuneinsight/lattigo/v6/ring"
-	"github.com/tuneinsight/lattigo/v6/utils/bignum"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/utils/bignum"
 )
 
 // MulBySmallMonomialMod2N multiplies pol by x^n, with 0 <= n < N

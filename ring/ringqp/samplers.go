@@ -1,8 +1,8 @@
 package ringqp
 
 import (
-	"github.com/tuneinsight/lattigo/v6/ring"
-	"github.com/tuneinsight/lattigo/v6/utils/sampling"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/utils/sampling"
 )
 
 // UniformSampler is a type for sampling polynomials in Ring.

@@ -4,9 +4,9 @@ import (
 	"bufio"
 	"io"
 
-	"github.com/tuneinsight/lattigo/v6/utils"
-	"github.com/tuneinsight/lattigo/v6/utils/buffer"
-	"github.com/tuneinsight/lattigo/v6/utils/structs"
+	"github.com/cipherflow-fhe/lattigo/utils"
+	"github.com/cipherflow-fhe/lattigo/utils/buffer"
+	"github.com/cipherflow-fhe/lattigo/utils/structs"
 )
 
 // Poly is the structure that contains the coefficients of a polynomial.

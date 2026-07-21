@@ -41,11 +41,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
-	"github.com/tuneinsight/lattigo/v6/multiparty"
-	"github.com/tuneinsight/lattigo/v6/ring"
-	"github.com/tuneinsight/lattigo/v6/schemes/bgv"
-	"github.com/tuneinsight/lattigo/v6/utils/sampling"
+	"github.com/cipherflow-fhe/lattigo/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/multiparty"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/schemes/bgv"
+	"github.com/cipherflow-fhe/lattigo/utils/sampling"
 )
 
 // party is a type for the parties' state in the protocol, to be kept accross the different phases.

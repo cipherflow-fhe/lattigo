@@ -6,9 +6,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/core/rlwe"
 
-	"github.com/tuneinsight/lattigo/v6/schemes/ckks"
+	"github.com/cipherflow-fhe/lattigo/schemes/ckks"
 )
 
 func BenchmarkConcurrentBootstrap(b *testing.B) {

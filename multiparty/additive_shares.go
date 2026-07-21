@@ -3,7 +3,7 @@ package multiparty
 import (
 	"math/big"
 
-	"github.com/tuneinsight/lattigo/v6/ring"
+	"github.com/cipherflow-fhe/lattigo/ring"
 )
 
 // AdditiveShare is a type for storing additively shared values in Z_Q[X] (RNS domain).

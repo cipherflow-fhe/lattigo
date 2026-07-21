@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
-	"github.com/tuneinsight/lattigo/v6/ring"
-	"github.com/tuneinsight/lattigo/v6/utils/buffer"
+	"github.com/cipherflow-fhe/lattigo/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/utils/buffer"
 )
 
 // GaloisKeyGenProtocol is the structure storing the parameters for the collective GaloisKeys generation.

@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
-	"github.com/tuneinsight/lattigo/v6/ring"
-	"github.com/tuneinsight/lattigo/v6/ring/ringqp"
-	"github.com/tuneinsight/lattigo/v6/utils"
-	"github.com/tuneinsight/lattigo/v6/utils/structs"
+	"github.com/cipherflow-fhe/lattigo/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/ring/ringqp"
+	"github.com/cipherflow-fhe/lattigo/utils"
+	"github.com/cipherflow-fhe/lattigo/utils/structs"
 )
 
 type Integer interface {

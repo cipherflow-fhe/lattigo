@@ -1,4 +1,4 @@
-module github.com/tuneinsight/lattigo/v6
+module github.com/cipherflow-fhe/lattigo
 
 go 1.25.0
 

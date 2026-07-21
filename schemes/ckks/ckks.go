@@ -3,7 +3,7 @@
 package ckks
 
 import (
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/core/rlwe"
 )
 
 // NewPlaintext allocates a new [rlwe.Plaintext].

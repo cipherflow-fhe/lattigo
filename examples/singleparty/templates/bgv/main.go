@@ -6,8 +6,8 @@ import (
 	"math/rand"
 	"slices"
 
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
-	"github.com/tuneinsight/lattigo/v6/schemes/bgv"
+	"github.com/cipherflow-fhe/lattigo/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/schemes/bgv"
 )
 
 func main() {

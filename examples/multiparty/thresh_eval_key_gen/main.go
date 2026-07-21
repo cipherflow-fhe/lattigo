@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
-	"github.com/tuneinsight/lattigo/v6/multiparty"
-	"github.com/tuneinsight/lattigo/v6/utils/sampling"
+	"github.com/cipherflow-fhe/lattigo/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/multiparty"
+	"github.com/cipherflow-fhe/lattigo/utils/sampling"
 )
 
 // This example showcases the use of the multiparty package to generate an evaluation key in a multiparty setting.

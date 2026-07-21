@@ -11,9 +11,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tuneinsight/lattigo/v6/ring"
-	"github.com/tuneinsight/lattigo/v6/schemes/ckks"
-	"github.com/tuneinsight/lattigo/v6/utils/bignum"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/schemes/ckks"
+	"github.com/cipherflow-fhe/lattigo/utils/bignum"
 )
 
 var flagParamString = flag.String("params", "", "specify the test cryptographic parameters as a JSON string. Overrides -short.")

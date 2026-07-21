@@ -6,10 +6,10 @@ import (
 	"math"
 	"math/bits"
 
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
-	"github.com/tuneinsight/lattigo/v6/ring"
-	"github.com/tuneinsight/lattigo/v6/schemes/bgv"
-	"github.com/tuneinsight/lattigo/v6/utils/sampling"
+	"github.com/cipherflow-fhe/lattigo/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/schemes/bgv"
+	"github.com/cipherflow-fhe/lattigo/utils/sampling"
 )
 
 var flagShort = flag.Bool("short", false, "run the example with a smaller and insecure ring degree.")

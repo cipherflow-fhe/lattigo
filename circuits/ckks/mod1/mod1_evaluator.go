@@ -6,10 +6,10 @@ import (
 	"math/big"
 	"math/cmplx"
 
-	"github.com/tuneinsight/lattigo/v6/circuits/ckks/polynomial"
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
-	"github.com/tuneinsight/lattigo/v6/schemes/ckks"
-	"github.com/tuneinsight/lattigo/v6/utils/bignum"
+	"github.com/cipherflow-fhe/lattigo/circuits/ckks/polynomial"
+	"github.com/cipherflow-fhe/lattigo/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/schemes/ckks"
+	"github.com/cipherflow-fhe/lattigo/utils/bignum"
 )
 
 // Evaluator is an evaluator providing an API for homomorphic evaluations of scaled x mod 1.

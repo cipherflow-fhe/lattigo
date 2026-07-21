@@ -5,7 +5,7 @@ import (
 	"math"
 	"math/bits"
 
-	"github.com/tuneinsight/lattigo/v6/utils/sampling"
+	"github.com/cipherflow-fhe/lattigo/utils/sampling"
 )
 
 const ternarySamplerPrecision = uint64(56)

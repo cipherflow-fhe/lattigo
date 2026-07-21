@@ -7,12 +7,12 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/tuneinsight/lattigo/v6/utils/buffer"
-	"github.com/tuneinsight/lattigo/v6/utils/sampling"
-	"github.com/tuneinsight/lattigo/v6/utils/structs"
+	"github.com/cipherflow-fhe/lattigo/utils/buffer"
+	"github.com/cipherflow-fhe/lattigo/utils/sampling"
+	"github.com/cipherflow-fhe/lattigo/utils/structs"
 
 	"github.com/stretchr/testify/require"
-	"github.com/tuneinsight/lattigo/v6/utils/bignum"
+	"github.com/cipherflow-fhe/lattigo/utils/bignum"
 )
 
 var T = uint64(0x3ee0001)

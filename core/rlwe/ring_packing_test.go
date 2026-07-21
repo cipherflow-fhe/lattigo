@@ -10,8 +10,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tuneinsight/lattigo/v6/ring"
-	"github.com/tuneinsight/lattigo/v6/utils"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 const (

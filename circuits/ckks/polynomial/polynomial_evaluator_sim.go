@@ -5,11 +5,11 @@ import (
 	"math/big"
 	"math/bits"
 
-	"github.com/tuneinsight/lattigo/v6/circuits/common/polynomial"
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
-	"github.com/tuneinsight/lattigo/v6/schemes/ckks"
-	"github.com/tuneinsight/lattigo/v6/utils"
-	"github.com/tuneinsight/lattigo/v6/utils/bignum"
+	"github.com/cipherflow-fhe/lattigo/circuits/common/polynomial"
+	"github.com/cipherflow-fhe/lattigo/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/schemes/ckks"
+	"github.com/cipherflow-fhe/lattigo/utils"
+	"github.com/cipherflow-fhe/lattigo/utils/bignum"
 )
 
 // simEvaluator is a struct used to pre-compute the scaling

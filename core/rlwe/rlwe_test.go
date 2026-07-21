@@ -13,12 +13,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tuneinsight/lattigo/v6/ring"
-	"github.com/tuneinsight/lattigo/v6/ring/ringqp"
-	"github.com/tuneinsight/lattigo/v6/utils"
-	"github.com/tuneinsight/lattigo/v6/utils/buffer"
-	"github.com/tuneinsight/lattigo/v6/utils/sampling"
-	"github.com/tuneinsight/lattigo/v6/utils/structs"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/ring/ringqp"
+	"github.com/cipherflow-fhe/lattigo/utils"
+	"github.com/cipherflow-fhe/lattigo/utils/buffer"
+	"github.com/cipherflow-fhe/lattigo/utils/sampling"
+	"github.com/cipherflow-fhe/lattigo/utils/structs"
 )
 
 var flagParamString = flag.String("params", "", "specify the test cryptographic parameters as a JSON string. Overrides -short and -long.")

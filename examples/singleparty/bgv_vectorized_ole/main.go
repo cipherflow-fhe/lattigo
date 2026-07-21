@@ -6,9 +6,9 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/tuneinsight/lattigo/v6/ring"
-	"github.com/tuneinsight/lattigo/v6/utils/bignum"
-	"github.com/tuneinsight/lattigo/v6/utils/sampling"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/utils/bignum"
+	"github.com/cipherflow-fhe/lattigo/utils/sampling"
 )
 
 // Vectorized oblivious evaluation is a two-party protocol for the function f(x) = ax + b where a sender

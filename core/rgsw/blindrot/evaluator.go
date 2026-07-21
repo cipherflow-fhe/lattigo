@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/tuneinsight/lattigo/v6/core/rgsw"
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
-	"github.com/tuneinsight/lattigo/v6/ring"
-	"github.com/tuneinsight/lattigo/v6/utils/bignum"
+	"github.com/cipherflow-fhe/lattigo/core/rgsw"
+	"github.com/cipherflow-fhe/lattigo/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/utils/bignum"
 )
 
 // Evaluator is a struct that stores the necessary

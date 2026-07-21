@@ -3,11 +3,11 @@ package minimax
 import (
 	"fmt"
 
-	"github.com/tuneinsight/lattigo/v6/circuits/ckks/bootstrapping"
-	"github.com/tuneinsight/lattigo/v6/circuits/ckks/polynomial"
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
-	"github.com/tuneinsight/lattigo/v6/ring"
-	"github.com/tuneinsight/lattigo/v6/schemes/ckks"
+	"github.com/cipherflow-fhe/lattigo/circuits/ckks/bootstrapping"
+	"github.com/cipherflow-fhe/lattigo/circuits/ckks/polynomial"
+	"github.com/cipherflow-fhe/lattigo/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/schemes/ckks"
 )
 
 // Evaluator is an evaluator used to evaluate composite polynomials on ciphertexts.

@@ -3,7 +3,7 @@ package rlwe
 import (
 	"fmt"
 
-	"github.com/tuneinsight/lattigo/v6/utils"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 // ApplyEvaluationKey is a generic method to apply an [EvaluationKey] on a ciphertext.

@@ -6,10 +6,10 @@ import (
 	"math"
 	"math/bits"
 
-	"github.com/tuneinsight/lattigo/v6/circuits/ckks/mod1"
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
-	"github.com/tuneinsight/lattigo/v6/ring"
-	"github.com/tuneinsight/lattigo/v6/utils"
+	"github.com/cipherflow-fhe/lattigo/circuits/ckks/mod1"
+	"github.com/cipherflow-fhe/lattigo/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 // ParametersLiteral is a struct to parameterize the bootstrapping parameters.

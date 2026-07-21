@@ -1,9 +1,9 @@
 package examples
 
 import (
-	"github.com/tuneinsight/lattigo/v6/ring"
-	"github.com/tuneinsight/lattigo/v6/schemes/bgv"
-	"github.com/tuneinsight/lattigo/v6/schemes/ckks"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/schemes/bgv"
+	"github.com/cipherflow-fhe/lattigo/schemes/ckks"
 )
 
 var (

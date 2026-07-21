@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
-	"github.com/tuneinsight/lattigo/v6/schemes/ckks"
+	"github.com/cipherflow-fhe/lattigo/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/schemes/ckks"
 )
 
 func main() {

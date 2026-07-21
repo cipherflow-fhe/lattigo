@@ -3,7 +3,7 @@ package multiparty
 import (
 	"math"
 
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/core/rlwe"
 )
 
 // NoiseRelinearizationKey returns the standard deviation of the noise of each individual elements in the collective RelinearizationKey.

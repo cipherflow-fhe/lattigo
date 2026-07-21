@@ -2,11 +2,11 @@
 package lintrans
 
 import (
-	"github.com/tuneinsight/lattigo/v6/circuits/common/lintrans"
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
-	"github.com/tuneinsight/lattigo/v6/schemes"
-	"github.com/tuneinsight/lattigo/v6/schemes/bgv"
-	"github.com/tuneinsight/lattigo/v6/utils"
+	"github.com/cipherflow-fhe/lattigo/circuits/common/lintrans"
+	"github.com/cipherflow-fhe/lattigo/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/schemes"
+	"github.com/cipherflow-fhe/lattigo/schemes/bgv"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 // Diagonals is a wrapper of [lintrans.Diagonals].

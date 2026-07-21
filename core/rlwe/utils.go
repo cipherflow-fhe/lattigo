@@ -5,8 +5,8 @@ import (
 	"math/big"
 	"slices"
 
-	"github.com/tuneinsight/lattigo/v6/ring"
-	"github.com/tuneinsight/lattigo/v6/utils"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 // NoisePublicKey returns the log2 of the standard deviation of the input [PublicKey] with respect to the given [Secret] and parameters.

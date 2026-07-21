@@ -5,8 +5,8 @@ import (
 	"math/bits"
 	"unsafe"
 
-	"github.com/tuneinsight/lattigo/v6/utils/bignum"
-	"github.com/tuneinsight/lattigo/v6/utils/structs"
+	"github.com/cipherflow-fhe/lattigo/utils/bignum"
+	"github.com/cipherflow-fhe/lattigo/utils/structs"
 )
 
 // BasisExtender stores the necessary parameters for RNS basis extension.

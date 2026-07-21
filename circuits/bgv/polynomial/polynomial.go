@@ -2,9 +2,9 @@
 package polynomial
 
 import (
-	"github.com/tuneinsight/lattigo/v6/circuits/common/polynomial"
-	"github.com/tuneinsight/lattigo/v6/schemes/bgv"
-	"github.com/tuneinsight/lattigo/v6/utils/bignum"
+	"github.com/cipherflow-fhe/lattigo/circuits/common/polynomial"
+	"github.com/cipherflow-fhe/lattigo/schemes/bgv"
+	"github.com/cipherflow-fhe/lattigo/utils/bignum"
 )
 
 // Polynomial is a type wrapping the type [polynomial.Polynomial].

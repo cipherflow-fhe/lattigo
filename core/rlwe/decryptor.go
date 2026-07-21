@@ -3,8 +3,8 @@ package rlwe
 import (
 	"fmt"
 
-	"github.com/tuneinsight/lattigo/v6/ring"
-	"github.com/tuneinsight/lattigo/v6/utils"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 // Decryptor is a structure used to decrypt [Ciphertext]. It stores the secret-key.

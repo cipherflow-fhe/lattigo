@@ -6,8 +6,8 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/tuneinsight/lattigo/v6/utils"
-	"github.com/tuneinsight/lattigo/v6/utils/bignum"
+	"github.com/cipherflow-fhe/lattigo/utils"
+	"github.com/cipherflow-fhe/lattigo/utils/bignum"
 )
 
 // Polynomial is a struct storing P(x) = pk(x) o pk-1(x) o ... o p1(x) o p0(x).

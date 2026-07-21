@@ -4,11 +4,11 @@ package comparison
 import (
 	"math/big"
 
-	"github.com/tuneinsight/lattigo/v6/circuits/ckks/minimax"
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
-	"github.com/tuneinsight/lattigo/v6/schemes/ckks"
-	"github.com/tuneinsight/lattigo/v6/utils"
-	"github.com/tuneinsight/lattigo/v6/utils/bignum"
+	"github.com/cipherflow-fhe/lattigo/circuits/ckks/minimax"
+	"github.com/cipherflow-fhe/lattigo/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/schemes/ckks"
+	"github.com/cipherflow-fhe/lattigo/utils"
+	"github.com/cipherflow-fhe/lattigo/utils/bignum"
 )
 
 // Evaluator is an evaluator providing an API for homomorphic comparisons.

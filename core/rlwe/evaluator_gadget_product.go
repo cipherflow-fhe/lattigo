@@ -3,9 +3,9 @@ package rlwe
 import (
 	"fmt"
 
-	"github.com/tuneinsight/lattigo/v6/ring"
-	"github.com/tuneinsight/lattigo/v6/ring/ringqp"
-	"github.com/tuneinsight/lattigo/v6/utils"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/ring/ringqp"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 // GadgetProduct evaluates poly x Gadget -> RLWE where

@@ -37,14 +37,14 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/tuneinsight/lattigo/v6/circuits/ckks/bootstrapping"
-	"github.com/tuneinsight/lattigo/v6/circuits/ckks/dft"
-	"github.com/tuneinsight/lattigo/v6/circuits/ckks/mod1"
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
-	"github.com/tuneinsight/lattigo/v6/ring"
-	"github.com/tuneinsight/lattigo/v6/schemes/ckks"
-	"github.com/tuneinsight/lattigo/v6/utils"
-	"github.com/tuneinsight/lattigo/v6/utils/sampling"
+	"github.com/cipherflow-fhe/lattigo/circuits/ckks/bootstrapping"
+	"github.com/cipherflow-fhe/lattigo/circuits/ckks/dft"
+	"github.com/cipherflow-fhe/lattigo/circuits/ckks/mod1"
+	"github.com/cipherflow-fhe/lattigo/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/schemes/ckks"
+	"github.com/cipherflow-fhe/lattigo/utils"
+	"github.com/cipherflow-fhe/lattigo/utils/sampling"
 )
 
 var flagShort = flag.Bool("short", false, "run the example with a smaller and insecure ring degree.")

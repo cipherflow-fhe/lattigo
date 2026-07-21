@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
-	"github.com/tuneinsight/lattigo/v6/utils"
-	"github.com/tuneinsight/lattigo/v6/utils/sampling"
+	"github.com/cipherflow-fhe/lattigo/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/utils"
+	"github.com/cipherflow-fhe/lattigo/utils/sampling"
 )
 
 func BenchmarkHEBin(b *testing.B) {

@@ -6,11 +6,11 @@ import (
 	"io"
 	"math/bits"
 
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
-	"github.com/tuneinsight/lattigo/v6/schemes"
-	"github.com/tuneinsight/lattigo/v6/utils/bignum"
-	"github.com/tuneinsight/lattigo/v6/utils/buffer"
-	"github.com/tuneinsight/lattigo/v6/utils/structs"
+	"github.com/cipherflow-fhe/lattigo/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/schemes"
+	"github.com/cipherflow-fhe/lattigo/utils/bignum"
+	"github.com/cipherflow-fhe/lattigo/utils/buffer"
+	"github.com/cipherflow-fhe/lattigo/utils/structs"
 )
 
 // PowerBasis is a struct storing powers of a ciphertext.

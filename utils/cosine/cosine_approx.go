@@ -11,7 +11,7 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/tuneinsight/lattigo/v6/utils/bignum"
+	"github.com/cipherflow-fhe/lattigo/utils/bignum"
 )
 
 const (

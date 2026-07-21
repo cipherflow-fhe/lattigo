@@ -1,7 +1,7 @@
 package multiparty
 
 import (
-	"github.com/tuneinsight/lattigo/v6/utils/sampling"
+	"github.com/cipherflow-fhe/lattigo/utils/sampling"
 )
 
 // CRS is an interface for Common Reference Strings.

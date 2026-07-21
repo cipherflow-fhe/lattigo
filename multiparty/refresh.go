@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"io"
 
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
-	"github.com/tuneinsight/lattigo/v6/utils/buffer"
+	"github.com/cipherflow-fhe/lattigo/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/utils/buffer"
 )
 
 // RefreshShare is a struct storing the decryption and recryption shares.

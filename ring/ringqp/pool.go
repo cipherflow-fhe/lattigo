@@ -3,8 +3,8 @@ package ringqp
 import (
 	"fmt"
 
-	"github.com/tuneinsight/lattigo/v6/ring"
-	"github.com/tuneinsight/lattigo/v6/utils/structs"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/utils/structs"
 )
 
 // BufferPool represents a pool of polys that can be used (concurrently) to instantiate temporary polynomials in RingQP.

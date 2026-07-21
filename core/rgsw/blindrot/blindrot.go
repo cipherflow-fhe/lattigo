@@ -2,8 +2,8 @@
 package blindrot
 
 import (
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
-	"github.com/tuneinsight/lattigo/v6/ring"
+	"github.com/cipherflow-fhe/lattigo/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/ring"
 )
 
 // InitTestPolynomial takes a function g, and creates a test polynomial polynomial for the function in the interval [a, b].

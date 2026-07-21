@@ -6,9 +6,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
-	"github.com/tuneinsight/lattigo/v6/multiparty"
-	"github.com/tuneinsight/lattigo/v6/schemes/bgv"
+	"github.com/cipherflow-fhe/lattigo/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/multiparty"
+	"github.com/cipherflow-fhe/lattigo/schemes/bgv"
 )
 
 func BenchmarkInteger(b *testing.B) {

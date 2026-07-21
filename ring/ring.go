@@ -9,8 +9,8 @@ import (
 	"math/big"
 	"math/bits"
 
-	"github.com/tuneinsight/lattigo/v6/utils"
-	"github.com/tuneinsight/lattigo/v6/utils/bignum"
+	"github.com/cipherflow-fhe/lattigo/utils"
+	"github.com/cipherflow-fhe/lattigo/utils/bignum"
 )
 
 const (

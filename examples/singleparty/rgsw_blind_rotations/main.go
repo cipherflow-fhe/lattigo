@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/tuneinsight/lattigo/v6/core/rgsw/blindrot"
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
-	"github.com/tuneinsight/lattigo/v6/ring"
-	"github.com/tuneinsight/lattigo/v6/utils"
+	"github.com/cipherflow-fhe/lattigo/core/rgsw/blindrot"
+	"github.com/cipherflow-fhe/lattigo/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/ring"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 // Function to evaluate

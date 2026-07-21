@@ -3,7 +3,7 @@ package ring
 import (
 	"math/bits"
 
-	"github.com/tuneinsight/lattigo/v6/utils/bignum"
+	"github.com/cipherflow-fhe/lattigo/utils/bignum"
 )
 
 // MForm switches a to the Montgomery domain by computing
