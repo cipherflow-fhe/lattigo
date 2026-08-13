@@ -131,7 +131,7 @@ func (p Parameters) genEncapsulationEvaluationKeysNew(skDense *rlwe.SecretKey) (
 	paramsSparse, _ := rlwe.NewParametersFromLiteral(rlwe.ParametersLiteral{
 		LogN: params.LogN(),
 		Q:    params.Q()[:1],
-		P:    params.P()[:1],
+		P:    params.P(), // @company CipherFlow
 	})
 
 	kgenSparse := rlwe.NewKeyGenerator(paramsSparse)

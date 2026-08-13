@@ -119,6 +119,9 @@ type PlaintextMetaData struct {
 	// IsBitReversed is a flag indicating if the underlying plaintext is
 	// bit-reversed. This can be true for both batch and non-batched plaintexts.
 	IsBitReversed bool
+
+	// IsRingT is a flag indicating if the underlying plaintext is represented in RingT.
+	IsRingT bool // @company CipherFlow
 }
 
 // Slots returns the total number of slots that the plaintext holds.
@@ -143,13 +146,14 @@ func (m *PlaintextMetaData) Equal(other *PlaintextMetaData) (res bool) {
 	res = cmp.Equal(&m.Scale, &other.Scale)
 	res = res && m.IsBatched == other.IsBatched
 	res = res && m.IsBitReversed == other.IsBitReversed
+	res = res && m.IsRingT == other.IsRingT // @company CipherFlow
 	res = res && m.LogDimensions == other.LogDimensions
 	return
 }
 
 // BinarySize returns the size in bytes that the object once marshalled into a binary form.
 func (m PlaintextMetaData) BinarySize() int {
-	return 84 + m.Scale.BinarySize()
+	return 101 + m.Scale.BinarySize() // @company CipherFlow
 }
 
 // WriteTo writes the object on an [io.Writer]. It implements the [io.WriterTo]
@@ -207,15 +211,22 @@ func (m PlaintextMetaData) MarshalJSON() (p []byte, err error) {
 		IsBitReversed = 1
 	}
 
+	var IsRingT uint8 // @company CipherFlow
+	if m.IsRingT {
+		IsRingT = 1
+	}
+
 	aux := &struct {
 		Scale         Scale
 		IsBatched     string
 		IsBitReversed string
+		IsRingT       string // @company CipherFlow
 		LogDimensions [2]string
 	}{
 		Scale:         m.Scale,
 		IsBatched:     fmt.Sprintf("0x%02x", IsBatched),
 		IsBitReversed: fmt.Sprintf("0x%02x", IsBitReversed),
+		IsRingT:       fmt.Sprintf("0x%02x", IsRingT), // @company CipherFlow
 		/* #nosec G115 -- Rows and Cols cannot be negative if valid */
 		LogDimensions: [2]string{fmt.Sprintf("0x%02x", uint8(m.LogDimensions.Rows)), fmt.Sprintf("0x%02x", uint8(m.LogDimensions.Cols))},
 	}
@@ -235,6 +246,7 @@ func (m *PlaintextMetaData) UnmarshalJSON(p []byte) (err error) {
 		Scale         Scale
 		IsBatched     string
 		IsBitReversed string
+		IsRingT       string // @company CipherFlow
 		LogDimensions [2]string
 	}{}
 
@@ -258,6 +270,14 @@ func (m *PlaintextMetaData) UnmarshalJSON(p []byte) (err error) {
 		m.IsBitReversed = true
 	} else {
 		m.IsBitReversed = false
+	}
+
+	if y, err := hexconv(aux.IsRingT); err != nil { // @company CipherFlow
+		return err
+	} else if y == 1 {
+		m.IsRingT = true
+	} else {
+		m.IsRingT = false
 	}
 
 	logRows, err := hexconv(aux.LogDimensions[0])

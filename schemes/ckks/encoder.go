@@ -155,9 +155,15 @@ func (ecd Encoder) GetRLWEParameters() rlwe.Parameters {
 // The imaginary part will be discarded if ringType == ring.ConjugateInvariant.
 func (ecd Encoder) Encode(values interface{}, pt *rlwe.Plaintext) (err error) {
 	if pt.IsBatched {
+		if pt.IsRingT { // @company CipherFlow
+			return ecd.EmbedRingT(values, pt.MetaData, pt.Value)
+		}
 		return ecd.Embed(values, pt.MetaData, pt.Value)
 
 	} else {
+		if pt.IsRingT { // @company CipherFlow
+			return ecd.encodeCoeffsRingT(values, pt)
+		}
 
 		switch values := values.(type) {
 		case []float64:
@@ -188,6 +194,76 @@ func (ecd Encoder) Encode(values interface{}, pt *rlwe.Plaintext) (err error) {
 	return
 }
 
+// @company CipherFlow
+func (ecd Encoder) encodeCoeffsRingT(values interface{}, pt *rlwe.Plaintext) (err error) {
+	if !pt.IsRingT {
+		return fmt.Errorf("cannot EncodeRingT: plaintext is not in RingT")
+	}
+
+	if pt.Level() != 0 {
+		return fmt.Errorf("cannot EncodeRingT: plaintext level must be 0 but is %d", pt.Level())
+	}
+
+	switch values := values.(type) {
+	case []float64:
+
+		if len(values) > ecd.parameters.N() {
+			return fmt.Errorf("cannot EncodeRingT: maximum number of values is %d but len(values) is %d", ecd.parameters.N(), len(values))
+		}
+
+		Float64ToFixedPointCRT(ecd.parameters.RingQ().AtLevel(0), values, pt.Scale.Float64(), pt.Value.Coeffs[:1])
+
+	case []*big.Float:
+
+		if len(values) > ecd.parameters.N() {
+			return fmt.Errorf("cannot EncodeRingT: maximum number of values is %d but len(values) is %d", ecd.parameters.N(), len(values))
+		}
+
+		BigFloatToFixedPointCRT(ecd.parameters.RingQ().AtLevel(0), values, &pt.Scale.Value, pt.Value.Coeffs[:1])
+
+	default:
+		return fmt.Errorf("cannot EncodeRingT: supported values.(type) for IsBatched=False is []float64 or []*big.Float, but %T was given", values)
+	}
+
+	return
+}
+
+// RingTToPt converts a RingT plaintext to a regular CKKS plaintext.
+// @company CipherFlow
+func (ecd Encoder) RingTToPt(ptRingT, pt *rlwe.Plaintext) (err error) {
+	if !ptRingT.IsRingT {
+		return fmt.Errorf("cannot RingTToPt: input plaintext is not in RingT")
+	}
+
+	if ptRingT.Level() != 0 {
+		return fmt.Errorf("cannot RingTToPt: input plaintext level must be 0 but is %d", ptRingT.Level())
+	}
+
+	if ptRingT.IsNTT || ptRingT.IsMontgomery {
+		return fmt.Errorf("cannot RingTToPt: input plaintext must be outside NTT and Montgomery domains")
+	}
+
+	ringQ := ecd.parameters.RingQ().AtLevel(pt.Level())
+	ringQ0, err := ring.NewRingFromType(ecd.parameters.N(), ecd.parameters.Q()[:1], ecd.parameters.RingType())
+	if err != nil {
+		return fmt.Errorf("cannot RingTToPt: %w", err)
+	}
+
+	basisExtender := ring.NewBasisExtender(ringQ0, ringQ)
+	basisExtender.ModUpQtoP(0, pt.Level(), ptRingT.Value, pt.Value)
+
+	pt.IsRingT = false
+	if pt.IsBatched {
+		rlwe.NTTSparseAndMontgomery(ringQ, pt.MetaData, pt.Value)
+	} else {
+		if pt.IsNTT {
+			ringQ.NTT(pt.Value, pt.Value)
+		}
+	}
+
+	return
+}
+
 // Decode decodes the input plaintext on a new FloatSlice.
 func (ecd Encoder) Decode(pt *rlwe.Plaintext, values interface{}) (err error) {
 	return ecd.DecodePublic(pt, values, 0)
@@ -211,6 +287,84 @@ func (ecd Encoder) Embed(values interface{}, metadata *rlwe.MetaData, polyOut in
 	}
 
 	return ecd.embedArbitrary(values, metadata, polyOut)
+}
+
+// EmbedRingT encodes a FloatSlice on a RingT plaintext polynomial.
+// @company CipherFlow
+func (ecd Encoder) EmbedRingT(values interface{}, metadata *rlwe.MetaData, polyOut interface{}) (err error) {
+	if ecd.prec > 53 { // @company CipherFlow
+		return fmt.Errorf("cannot EmbedRingT: precision %d > 53 is not supported", ecd.prec)
+	}
+
+	return ecd.embedRingTDouble(values, metadata, polyOut)
+}
+
+// embedRingTDouble encodes a FloatSlice on RingT using FFT with complex128 arithmetic.
+// @company CipherFlow
+func (ecd Encoder) embedRingTDouble(values FloatSlice, metadata *rlwe.MetaData, polyOut interface{}) (err error) {
+	if maxLogCols := ecd.parameters.LogMaxDimensions().Cols; metadata.LogDimensions.Cols < 0 || metadata.LogDimensions.Cols > maxLogCols {
+		return fmt.Errorf("cannot EmbedRingT: logSlots (%d) must be greater or equal to %d and smaller than %d", metadata.LogDimensions.Cols, 0, maxLogCols)
+	}
+
+	slots := 1 << metadata.LogDimensions.Cols
+	var lenValues int
+
+	buffRef := ecd.BuffComplexPool.Get().(*[]complex128)
+	defer ecd.BuffComplexPool.Put(buffRef)
+	buffCmplx := *buffRef
+
+	switch values := values.(type) {
+	case []complex128:
+		lenValues = len(values)
+		if maxCols := ecd.parameters.MaxDimensions().Cols; lenValues > maxCols || lenValues > slots {
+			return fmt.Errorf("cannot EmbedRingT: ensure that #values (%d) <= slots (%d) <= maxCols (%d)", len(values), slots, maxCols)
+		}
+
+		if ecd.parameters.RingType() == ring.ConjugateInvariant {
+			for i := range values {
+				buffCmplx[i] = complex(real(values[i]), 0)
+			}
+		} else {
+			copy(buffCmplx[:len(values)], values)
+		}
+
+	case []float64:
+		lenValues = len(values)
+		if maxCols := ecd.parameters.MaxDimensions().Cols; lenValues > maxCols || lenValues > slots {
+			return fmt.Errorf("cannot EmbedRingT: ensure that #values (%d) <= slots (%d) <= maxCols (%d)", len(values), slots, maxCols)
+		}
+
+		for i := range values {
+			buffCmplx[i] = complex(values[i], 0)
+		}
+
+	default:
+		return fmt.Errorf("cannot EmbedRingT: values.(Type) must be []complex128 or []float64, but is %T", values)
+	}
+
+	for i := lenValues; i < slots; i++ {
+		buffCmplx[i] = 0
+	}
+
+	if err = ecd.IFFT(buffCmplx[:slots], metadata.LogDimensions.Cols); err != nil {
+		return
+	}
+
+	scale := metadata.Scale.Float64()
+
+	switch p := polyOut.(type) {
+	case ringqp.Poly:
+		Complex128ToFixedPointRingT(ecd.parameters.RingQ(), buffCmplx[:slots], scale, p.Q.Coeffs[0])
+		if p.P.Level() > -1 {
+			Complex128ToFixedPointRingT(ecd.parameters.RingP(), buffCmplx[:slots], scale, p.P.Coeffs[0])
+		}
+	case ring.Poly:
+		Complex128ToFixedPointRingT(ecd.parameters.RingQ(), buffCmplx[:slots], scale, p.Coeffs[0])
+	default:
+		return fmt.Errorf("cannot EmbedRingT: invalid polyOut.(Type) must be ringqp.Poly or ring.Poly")
+	}
+
+	return
 }
 
 // embedDouble encode a FloatSlice on polyOut using FFT with complex128 arithmetic.
@@ -473,11 +627,11 @@ func (ecd Encoder) embedArbitrary(values FloatSlice, metadata *rlwe.MetaData, po
 }
 
 // plaintextToComplex maps a CRT polynomial to a complex valued [FloatSlice].
-func (ecd Encoder) plaintextToComplex(level int, scale rlwe.Scale, logSlots int, p ring.Poly, values FloatSlice) (err error) {
+func (ecd Encoder) plaintextToComplex(level int, scale rlwe.Scale, logSlots int, isRingT bool, p ring.Poly, values FloatSlice) (err error) { // @company CipherFlow
 
 	isreal := ecd.parameters.RingType() == ring.ConjugateInvariant
 	if level == 0 {
-		return polyToComplexNoCRT(p.Coeffs[0], values, scale, logSlots, isreal, ecd.parameters.RingQ().AtLevel(level))
+		return polyToComplexNoCRT(p.Coeffs[0], values, scale, logSlots, isreal, isRingT, ecd.parameters.RingQ().AtLevel(level)) // @company CipherFlow
 	}
 	bigintCoeffs := ecd.BuffBigIntPool.Get()
 	defer ecd.BuffBigIntPool.Put(bigintCoeffs)
@@ -525,7 +679,7 @@ func (ecd Encoder) decodePublic(pt *rlwe.Plaintext, values FloatSlice, logprec f
 			defer ecd.BuffComplexPool.Put(buffRef)
 			buffCmplx := *buffRef
 
-			if err = ecd.plaintextToComplex(pt.Level(), pt.Scale, logSlots, *buff, buffCmplx); err != nil {
+			if err = ecd.plaintextToComplex(pt.Level(), pt.Scale, logSlots, pt.IsRingT, *buff, buffCmplx); err != nil { // @company CipherFlow
 				return
 			}
 
@@ -604,7 +758,7 @@ func (ecd Encoder) decodePublic(pt *rlwe.Plaintext, values FloatSlice, logprec f
 			defer ecd.BuffComplexPool.Put(buffRef)
 			buffCmplx := *buffRef
 
-			if err = ecd.plaintextToComplex(pt.Level(), pt.Scale, logSlots, *buff, buffCmplx[:slots]); err != nil {
+			if err = ecd.plaintextToComplex(pt.Level(), pt.Scale, logSlots, pt.IsRingT, *buff, buffCmplx[:slots]); err != nil { // @company CipherFlow
 				return
 			}
 
@@ -820,12 +974,17 @@ func (ecd Encoder) FFT(values FloatSlice, logN int) (err error) {
 }
 
 // polyToComplexNoCRT decodes a single-level CRT poly on a complex valued [FloatSlice].
-func polyToComplexNoCRT(coeffs []uint64, values FloatSlice, scale rlwe.Scale, logSlots int, isreal bool, ringQ *ring.Ring) (err error) {
+func polyToComplexNoCRT(coeffs []uint64, values FloatSlice, scale rlwe.Scale, logSlots int, isreal bool, isRingT bool, ringQ *ring.Ring) (err error) { // @company CipherFlow
 
 	slots := 1 << logSlots
 	/* #nosec G115 -- library requires 64-bit system -> int = int64 */
 	maxCols := int(ringQ.NthRoot() >> 2)
 	gap := maxCols / slots
+	imagStart := maxCols // @company CipherFlow
+	if isRingT { // @company CipherFlow
+		gap = 1
+		imagStart = slots
+	}
 	Q := ringQ.SubRings[0].Modulus
 	var c uint64
 
@@ -841,7 +1000,7 @@ func polyToComplexNoCRT(coeffs []uint64, values FloatSlice, scale rlwe.Scale, lo
 		}
 
 		if !isreal {
-			for i, idx := 0, maxCols; i < slots; i, idx = i+1, idx+gap {
+			for i, idx := 0, imagStart; i < slots; i, idx = i+1, idx+gap { // @company CipherFlow
 				c = coeffs[idx]
 				if c >= Q>>1 {
 					values[i] += complex(0, -float64(Q-c))
@@ -884,7 +1043,7 @@ func polyToComplexNoCRT(coeffs []uint64, values FloatSlice, scale rlwe.Scale, lo
 		}
 
 		if !isreal {
-			for i, idx := 0, maxCols; i < slots; i, idx = i+1, idx+gap {
+			for i, idx := 0, imagStart; i < slots; i, idx = i+1, idx+gap { // @company CipherFlow
 
 				if values[i][1] == nil {
 					values[i][1] = new(big.Float)

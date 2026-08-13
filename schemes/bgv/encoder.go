@@ -154,6 +154,21 @@ func (ecd Encoder) Encode(values interface{}, pt *rlwe.Plaintext) (err error) {
 	}
 
 	if pt.IsBatched {
+		if pt.IsRingT { // @company CipherFlow
+			buffT := ecd.poolT.GetBuffPoly()
+			defer ecd.poolT.RecycleBuffPoly(buffT)
+			if err = ecd.EncodeRingT(values, pt.Scale, *buffT); err != nil {
+				return
+			}
+			copy(pt.Value.Coeffs[0], buffT.Coeffs[0])
+			for i := buffT.N(); i < len(pt.Value.Coeffs[0]); i++ {
+				pt.Value.Coeffs[0][i] = 0
+			}
+			if pt.IsNTT {
+				ecd.parameters.RingT().NTT(pt.Value, pt.Value)
+			}
+			return
+		}
 		return ecd.EmbedScale(values, true, pt.MetaData, pt.Value)
 	} else {
 
@@ -202,6 +217,13 @@ func (ecd Encoder) Encode(values interface{}, pt *rlwe.Plaintext) (err error) {
 		}
 
 		ringT.MulScalar(*buff, pt.Scale.Uint64(), *buff)
+		if pt.IsRingT { // @company CipherFlow
+			if pt.IsNTT {
+				ringT.NTT(*buff, *buff)
+			}
+			copy(pt.Value.Coeffs[0], buff.Coeffs[0])
+			return
+		}
 		ecd.RingT2Q(pt.Level(), true, *buff, pt.Value)
 
 		if pt.IsNTT {
@@ -493,7 +515,12 @@ func (ecd Encoder) Decode(pt *rlwe.Plaintext, values interface{}) (err error) {
 		defer ecd.poolQ.RecycleBuffPoly(buffT)
 	}
 
-	if pt.IsNTT {
+	if pt.IsRingT { // @company CipherFlow
+		copy(buffT.Coeffs[0], pt.Value.Coeffs[0])
+		if pt.IsNTT {
+			ecd.parameters.RingT().INTT(*buffT, *buffT)
+		}
+	} else if pt.IsNTT {
 		ringQ := ecd.parameters.RingQ().AtLevel(pt.Level())
 		poolQ := ecd.poolQ.AtLevel(pt.Level())
 		buffQ := poolQ.GetBuffPoly()

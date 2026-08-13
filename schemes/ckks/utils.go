@@ -152,6 +152,28 @@ func Complex128ToFixedPointCRT(r *ring.Ring, values []complex128, scale float64,
 	}
 }
 
+// @company CipherFlow
+func Complex128ToFixedPointRingT(r *ring.Ring, values []complex128, scale float64, coeffs []uint64) {
+	coeffsCRT := [][]uint64{coeffs}
+	ringQ0 := r.AtLevel(0)
+
+	for i, v := range values {
+		SingleFloat64ToFixedPointCRT(ringQ0, i, real(v), scale, coeffsCRT)
+	}
+
+	start := len(values)
+	if r.Type() == ring.Standard {
+		for i, v := range values {
+			SingleFloat64ToFixedPointCRT(ringQ0, i+start, imag(v), scale, coeffsCRT)
+		}
+		start *= 2
+	}
+
+	for i := start; i < len(coeffs); i++ {
+		coeffs[i] = 0
+	}
+}
+
 // Float64ToFixedPointCRT encodes a vector of floats on a CRT polynomial.
 func Float64ToFixedPointCRT(r *ring.Ring, values []float64, scale float64, coeffs [][]uint64) {
 

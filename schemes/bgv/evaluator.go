@@ -99,10 +99,12 @@ func (eval Evaluator) GetParameters() *Parameters {
 // shared with the receiver but the evaluation key is set to the provided [rlwe.EvaluationKeySet].
 func (eval Evaluator) WithKey(evk rlwe.EvaluationKeySet) *Evaluator {
 	return &Evaluator{
-		evaluatorBase: eval.evaluatorBase,
-		Evaluator:     eval.Evaluator.WithKey(evk),
-		Encoder:       eval.Encoder,
-		pool:          eval.pool,
+		evaluatorBase:  eval.evaluatorBase,
+		Evaluator:      eval.Evaluator.WithKey(evk),
+		Encoder:        eval.Encoder,
+		ScaleInvariant: eval.ScaleInvariant, // @company CipherFlow
+		pool:           eval.pool,
+		poolQMul:       eval.poolQMul, // @company CipherFlow
 	}
 }
 
@@ -1366,6 +1368,21 @@ func (eval Evaluator) Rescale(op0, opOut *rlwe.Ciphertext) (err error) {
 		return nil
 	}
 
+	return eval.rescale(op0, opOut) // @company CipherFlow
+}
+
+// @company CipherFlow
+// RescaleScaleInvariant divides op0 by the last prime even when the evaluator is
+// configured for scale-invariant BFV-style tensoring.
+func (eval Evaluator) RescaleScaleInvariant(op0, opOut *rlwe.Ciphertext) (err error) {
+	return eval.rescale(op0, opOut)
+}
+
+func (eval Evaluator) rescale(op0, opOut *rlwe.Ciphertext) (err error) {
+	// if eval.ScaleInvariant { // @company CipherFlow
+	// 	return nil
+	// }
+
 	if op0.MetaData == nil || opOut.MetaData == nil {
 		return fmt.Errorf("cannot Rescale: op0.MetaData or opOut.MetaData is nil")
 	}
@@ -1435,6 +1452,38 @@ func (eval Evaluator) RotateRowsNew(op0 *rlwe.Ciphertext) (opOut *rlwe.Ciphertex
 // The procedure will return an error if either op0.Degree() or op1.Degree() != 1.
 func (eval Evaluator) RotateRows(op0, opOut *rlwe.Ciphertext) (err error) {
 	return eval.Automorphism(op0, eval.parameters.GaloisElementForRowRotation(), opOut)
+}
+
+// @company CipherFlow
+// RotateHoistedNew applies a series of rotations on the same ciphertext and returns each different rotation in a map indexed by the rotation.
+func (eval Evaluator) RotateHoistedNew(ctIn *rlwe.Ciphertext, rotations []int) (opOut map[int]*rlwe.Ciphertext, err error) {
+	opOut = make(map[int]*rlwe.Ciphertext)
+	for _, i := range rotations {
+		opOut[i] = NewCiphertext(eval.parameters, 1, ctIn.Level())
+	}
+
+	return opOut, eval.RotateHoisted(ctIn, rotations, opOut)
+}
+
+// @company CipherFlow
+// RotateHoisted takes an input Ciphertext and a list of rotations and populates a map of pre-allocated Ciphertexts,
+// where each element of the map is the input Ciphertext rotation by one element of the list.
+func (eval Evaluator) RotateHoisted(ctIn *rlwe.Ciphertext, rotations []int, opOut map[int]*rlwe.Ciphertext) (err error) {
+	levelQ := ctIn.Level()
+	levelP := eval.parameters.MaxLevelP()
+
+	poolQP := eval.pool.AtLevel(levelQ, levelP)
+	buffDecompQP := poolQP.GetBuffDecompQP(*eval.GetRLWEParameters(), levelQ, levelP)
+	defer poolQP.RecycleBuffDecompQP(buffDecompQP)
+
+	eval.DecomposeNTT(levelQ, levelP, eval.parameters.PCount(), ctIn.Value[1], ctIn.IsNTT, buffDecompQP)
+	for _, i := range rotations {
+		if err = eval.AutomorphismHoisted(levelQ, ctIn, buffDecompQP, eval.parameters.GaloisElement(i), opOut[i]); err != nil {
+			return fmt.Errorf("cannot RotateHoisted: %w", err)
+		}
+	}
+
+	return
 }
 
 // RotateHoistedLazyNew applies a series of rotations on the same ciphertext and returns each different rotation in a map indexed by the rotation.
