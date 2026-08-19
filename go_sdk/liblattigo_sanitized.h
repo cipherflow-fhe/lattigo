@@ -31,6 +31,7 @@ extern const char *_GoStringPtr(_GoString_ s);
 
 #include <stdint.h>
 #include <stdlib.h>
+#include "../../../abi/c_types.h"
 
 #ifndef GO_SDK_ERROR_STATUS_DEFINED
 #define GO_SDK_ERROR_STATUS_DEFINED
@@ -39,15 +40,6 @@ typedef struct ErrorStatus {
     char* message;
 } ErrorStatus;
 #endif
-
-typedef struct Metadata {
-    uint8_t is_ringt;
-    uint8_t is_batched;
-    int degree;
-    int level;
-    int log_slots;
-    double scale;
-} Metadata;
 
 
 
@@ -179,13 +171,10 @@ extern void ReleaseHandle(GoUint64 handleID);
 extern void FreeGoString(char* s);
 extern ErrorStatus NewPlaintext(GoUint64 parameterHandle, Metadata* metadata, uint64_t* plaintextHandle);
 extern void GetPlaintextMetadata(GoUint64 plaintextHandle, Metadata* metadata);
-extern GoFloat64 GetPlaintextScale(GoUint64 plaintextHandle);
 extern ErrorStatus SerializePlaintext(GoUint64 plaintextHandle, GoUint8** rawData, uint64_t* length, uint64_t* dataHandle);
 extern ErrorStatus DeserializePlaintext(GoUint8* rawData, uint64_t length, uint64_t* plaintextHandle);
 extern ErrorStatus NewCiphertext(GoUint64 parameterHandle, GoInt degree, GoInt level, uint64_t* ciphertextHandle);
-extern GoInt GetCiphertextDegree(GoUint64 ciphertextHandle);
 extern void GetCiphertextMetadata(GoUint64 ciphertextHandle, Metadata* metadata);
-extern GoFloat64 GetCiphertextScale(GoUint64 ciphertextHandle);
 extern GoFloat64 SetCiphertextScale(GoUint64 ciphertextHandle, GoFloat64 scaleIn);
 extern ErrorStatus SerializeCiphertext(GoUint64 ciphertextHandle, GoUint8** rawData, uint64_t* length, uint64_t* dataHandle);
 extern ErrorStatus DeserializeCiphertext(GoUint8* rawData, uint64_t length, uint64_t* ciphertextHandle);
@@ -313,19 +302,10 @@ extern ErrorStatus SetCkksBootstrappingEvaluationKeySparseToDense(GoUint64 boots
 extern ErrorStatus CreateCkksBtpEvaluator(GoUint64 parameterHandle, GoUint64 bootstrappingEvaluationKeysHandle, uint64_t* evaluatorHandle);
 extern ErrorStatus CkksBootstrap(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, uint64_t* opOutCiphertextHandle);
 extern ErrorStatus CkksBootstrapMany(GoUint64 evaluatorHandle, uint64_t* op0CiphertextHandles, GoInt op0Count, uint64_t* opOutCiphertextHandles);
-extern void ImportBfvCiphertext(GoUint64 destHandle, CCiphertext* cCiphertext);
-extern void ImportCkksCiphertext(GoUint64 destHandle, CCiphertext* cCiphertext);
-extern void ExportBfvPlaintextRingt(GoUint64 plaintextRingtHandle, CPlaintext* plaintext);
-extern void ExportCkksPlaintextRingt(GoUint64 plaintextRingtHandle, CPlaintext* plaintext);
-extern void ExportBfvPlaintext(GoUint64 plaintextHandle, CPlaintext* plaintext);
-extern void ExportCkksPlaintext(GoUint64 plaintextHandle, CPlaintext* plaintext);
-extern void ExportBfvCiphertext(GoUint64 ciphertextHandle, CCiphertext* ciphertext);
-extern void ExportCkksCiphertext(GoUint64 ciphertextHandle, CCiphertext* ciphertext);
-extern void ExportBfvRelinKey(GoUint64 parameterHandle, GoUint64 relinKeyHandle, GoInt level, GoInt keyMFNBits, CRelinKey* relinKey);
-extern void ExportCkksRelinKey(GoUint64 parameterHandle, GoUint64 relinKeyHandle, GoInt level, GoInt keyMFNBits, CRelinKey* relinKey);
-extern void ExportBfvGaloisKey(GoUint64 parameterHandle, GoUint64 galoisKeyHandle, GoInt level, GoInt keyMFNBits, CGaloisKey* galoisKey);
-extern void ExportCkksGaloisKey(GoUint64 parameterHandle, GoUint64 galoisKeyHandle, GoInt level, GoInt keyMFNBits, CGaloisKey* galoisKey);
-extern void ExportCkksSwitchingKey(GoUint64 parameterHandle, GoUint64 switchingKeyHandle, GoInt levelQ, GoInt levelP, GoInt keyMFNBits, CSwitchingKey* switchingKey);
+extern ErrorStatus ImportCiphertext(GoUint64 parameterHandle, GoUint64 destHandle, Metadata* sourceMetadata, Metadata* targetMetadata, CCiphertext* cCiphertext);
+extern void ExportPlaintext(GoUint64 parameterHandle, GoUint64 plaintextHandle, Metadata* metadata, CPlaintext* plaintext);
+extern void ExportCiphertext(GoUint64 parameterHandle, GoUint64 ciphertextHandle, Metadata* metadata, CCiphertext* ciphertext);
+extern void ExportEvaluationKey(GoUint64 parameterHandle, GoUint64 evaluationKeyHandle, GoInt levelP, Metadata* metadata, CEvaluationKey* evaluationKey);
 extern void BfvPolyNttInplace(GoUint64 parameter_handle, uint64_t* data, GoInt level_q, GoInt level_p);
 extern void BfvPolyInvNttInplace(GoUint64 parameter_handle, uint64_t* data, GoInt level_q, GoInt level_p);
 extern void BfvPolyMulByPow2Inplace(GoUint64 parameter_handle, uint64_t* data, GoInt level_q, GoInt level_p, GoInt pow2);

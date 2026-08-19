@@ -3,6 +3,7 @@ package main
 /*
 #include <stdint.h>
 #include <stdlib.h>
+#include "../../../abi/c_types.h"
 
 #ifndef GO_SDK_ERROR_STATUS_DEFINED
 #define GO_SDK_ERROR_STATUS_DEFINED
@@ -11,15 +12,6 @@ typedef struct ErrorStatus {
     char* message;
 } ErrorStatus;
 #endif
-
-typedef struct Metadata {
-    uint8_t is_ringt;
-    uint8_t is_batched;
-    int degree;
-    int level;
-    int log_slots;
-    double scale;
-} Metadata;
 */
 import "C"
 
@@ -68,6 +60,9 @@ func NewPlaintext(parameterHandle uint64, metadata *C.Metadata, plaintextHandle 
 	if plaintext.IsRingT {
 		plaintext.IsNTT = false
 		plaintext.IsMontgomery = false
+	} else {
+		plaintext.IsNTT = metadata.is_ntt != 0
+		plaintext.IsMontgomery = metadata.mform_bits == 64
 	}
 	plaintext.IsBatched = metadata.is_batched != 0
 	scale := float64(metadata.scale)
@@ -80,6 +75,9 @@ func NewPlaintext(parameterHandle uint64, metadata *C.Metadata, plaintextHandle 
 	maxLogSlots := params.GetRLWEParameters().LogN()
 	if p, ok := params.(logMaxSlotsProvider); ok {
 		maxLogSlots = p.LogMaxSlots()
+	}
+	if logSlots < 0 {
+		logSlots = maxLogSlots
 	}
 	if logSlots > maxLogSlots {
 		return errorStatus(fmt.Errorf("log_slots %d exceeds max %d", logSlots, maxLogSlots))
@@ -108,12 +106,16 @@ func GetPlaintextMetadata(plaintextHandle uint64, metadata *C.Metadata) {
 	metadata.level = C.int(plaintext.Level())
 	metadata.log_slots = C.int(plaintext.LogSlots())
 	metadata.scale = C.double(plaintext.Scale.Float64())
-}
-
-//export GetPlaintextScale
-func GetPlaintextScale(plaintextHandle uint64) float64 {
-	plaintext := getObject[rlwe.Plaintext](plaintextHandle)
-	return plaintext.Scale.Float64()
+	if plaintext.IsNTT {
+		metadata.is_ntt = 1
+	} else {
+		metadata.is_ntt = 0
+	}
+	if plaintext.IsMontgomery {
+		metadata.mform_bits = 64
+	} else {
+		metadata.mform_bits = 0
+	}
 }
 
 //export SerializePlaintext
@@ -170,16 +172,14 @@ func NewCiphertext(parameterHandle uint64, degree int, level int, ciphertextHand
 	return status
 }
 
-//export GetCiphertextDegree
-func GetCiphertextDegree(ciphertextHandle uint64) int {
-	ciphertext := getObject[rlwe.Ciphertext](ciphertextHandle)
-	return ciphertext.Degree()
-}
-
 //export GetCiphertextMetadata
 func GetCiphertextMetadata(ciphertextHandle uint64, metadata *C.Metadata) {
 	ciphertext := getObject[rlwe.Ciphertext](ciphertextHandle)
-	metadata.is_ringt = 0
+	if ciphertext.IsRingT {
+		metadata.is_ringt = 1
+	} else {
+		metadata.is_ringt = 0
+	}
 	if ciphertext.IsBatched {
 		metadata.is_batched = 1
 	} else {
@@ -189,12 +189,16 @@ func GetCiphertextMetadata(ciphertextHandle uint64, metadata *C.Metadata) {
 	metadata.level = C.int(ciphertext.Level())
 	metadata.log_slots = C.int(ciphertext.LogSlots())
 	metadata.scale = C.double(ciphertext.Scale.Float64())
-}
-
-//export GetCiphertextScale
-func GetCiphertextScale(ciphertextHandle uint64) float64 {
-	ciphertext := getObject[rlwe.Ciphertext](ciphertextHandle)
-	return ciphertext.Scale.Float64()
+	if ciphertext.IsNTT {
+		metadata.is_ntt = 1
+	} else {
+		metadata.is_ntt = 0
+	}
+	if ciphertext.IsMontgomery {
+		metadata.mform_bits = 64
+	} else {
+		metadata.mform_bits = 0
+	}
 }
 
 //export SetCiphertextScale
