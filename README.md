@@ -6,44 +6,111 @@
 
 ![Go tests](https://github.com/tuneinsight/lattigo/actions/workflows/ci.yml/badge.svg)
 
-Lattigo is a Go module that implements Ring-Learning-With-Errors-based homomorphic-encryption
+Lattigo is a Go module that implements full-RNS Ring-Learning-With-Errors-based homomorphic-encryption
 primitives and Multiparty-Homomorphic-Encryption-based secure protocols. The library features:
-- An implementation of the full-RNS BFV and CKKS schemes and their respective multiparty versions.
-- Comparable performance to state-of-the-art C++ libraries.
-- Dense-key and sparse-key efficient and high-precision bootstrapping procedures for full-RNS CKKS.
-- A pure Go implementation that enables cross-platform builds, including WASM compilation for
-  browser clients.
+
+- Optimized arithmetic for power-of-two cyclotomic rings.
+- Advanced and scheme-agnostic implementation of RLWE-based primitives, key-generation, and their multiparty version.
+- Implementation of the BFV/BGV and CKKS schemes and their multiparty version.
+- Support for RGSW, external product and LMKCDEY blind rotations.
+- A pure Go implementation, enabling cross-platform builds, including WASM compilation for
+browser clients, with comparable performance to state-of-the-art C++ libraries.
 
 Lattigo is meant to support HE in distributed systems and microservices architectures, for which Go
 is a common choice thanks to its natural concurrency model and portability.
 
 ## Library overview
 
-The library exposes the following packages:
+<p align="center" width="100%">
+  <img width=500 height=350 alt="lattigo-hierarchy" src="./lattigo-hierarchy.svg">
+</p>
 
-- `lattigo/ring`: Modular arithmetic operations for polynomials in the RNS basis, including: RNS
-  basis extension; RNS rescaling; number theoretic transform (NTT); uniform, Gaussian and ternary
-  sampling.
+Lattigo is a strictly hierarchical library whose packages form a linear dependency chain ranging from
+low-level arithmetic functionalities to high-level homomorphic circuits. A graphical depiction of the
+Lattigo package organization is given in the Figure above.
 
-- `lattigo/bfv`: The Full-RNS variant of the Brakerski-Fan-Vercauteren scale-invariant homomorphic
-  encryption scheme. It provides modular arithmetic over the integers.
+- `lattigo/ring`: At the lowest level resides the `ring` package providing modular arithmetic operations for polynomials
+  in the RNS basis, including: RNS basis extension; RNS rescaling; number theoretic transform (NTT); uniform,
+  Gaussian and ternary sampling.
+  
+  - `lattigo/core`: This package implements the core cryptographic functionalities of the library and builds directly
+    upon the arithmetic functionalities provided by the `ring` package:
+
+	- `rlwe`: Common base for generic RLWE-based homomorphic encryption.
+      It provides all homomorphic functionalities and defines all structs that are not scheme-specific.
+      This includes plaintext, ciphertext, key-generation, encryption, decryption and key-switching, as
+      well as other more advanced primitives such as RLWE-repacking.
+
+    - `rgsw`: A Full-RNS variant of Ring-GSW ciphertexts and the external product.
 	
-- `lattigo/ckks`: The Full-RNS Homomorphic Encryption for Arithmetic for Approximate Numbers (HEAAN,
-  a.k.a. CKKS) scheme. It provides approximate arithmetic over the complex numbers (in its classic
-  variant) and over the real numbers (in its conjugate-invariant variant).
+- `lattigo/schemes`: The implementation of RLWE-based homomorphic encryption schemes are found in the `schemes` package:
 
-- `lattigo/dbfv` and `lattigo/dckks`: Multiparty (a.k.a. distributed or threshold) versions of the
-  BFV and CKKS schemes that enable secure multiparty computation solutions with secret-shared secret
-  keys.
+  - `bfv`: A Full-RNS variant of the Brakerski-Fan-Vercauteren scale-invariant homomorphic
+    encryption scheme. This scheme is instantiated via a wrapper of the `bgv` scheme. 
+    It provides modular arithmetic over the integers.
 
-- `lattigo/rlwe` and `lattigo/drlwe`: common base for generic RLWE-based multiparty homomorphic
-  encryption. It is imported by the `lattigo/bfv` and `lattigo/ckks` packages.
+  - `bgv`: A Full-RNS generalization of the Brakerski-Fan-Vercauteren scale-invariant (BFV) and 
+    Brakerski-Gentry-Vaikuntanathan (BGV) homomorphic encryption schemes. 
+    It provides modular arithmetic over the integers.
+  	
+  - `ckks`: A Full-RNS Homomorphic Encryption for Arithmetic for Approximate Numbers (HEAAN,
+    a.k.a. CKKS) scheme. It provides fixed-point approximate arithmetic over the complex numbers (in its classic
+    variant) and over the real numbers (in its conjugate-invariant variant).
+	
+- `lattigo/circuits`: The circuits package provides implementation of a select set of homomorphic circuits for
+  the `bgv` and `ckks` cryptosystems:
+  
+  - `bgv/lintrans`, `ckks/lintrans`: Arbitrary linear transformations and slot permutations for both `bgv` and `ckks`.
+    Scheme-generic objects and functions are part of `common/lintrans`.
+
+  - `bgv/polynomial`, `ckks/polynomial`: Polynomial evaluation circuits for `bgv` and `ckks`.
+    Scheme-generic objects and functions are part of `common/polynomial`.
+	
+  - `ckks/minimax`: Minimax composite polynomial evaluator for `ckks`.
+  
+  - `ckks/comparison`: Homomorphic comparison-based circuits such as `sign`, `max` and `step` for the `ckks` scheme.
+  
+  - `ckks/inverse`: Homomorphic inverse circuit for `ckks`.
+  
+  - `ckks/mod1`: Homomorphic circuit for the `mod1` function using the `ckks` cryptosystem.
+  
+  - `ckks/dft`: Homomorphic Discrete Fourier Transform circuits for the `ckks` scheme.
+  
+  - `ckks/bootstrapping`: Bootstrapping for fixed-point approximate arithmetic over the real
+     and complex numbers, i.e., the `ckks` scheme, with support for the Conjugate Invariant ring, batch bootstrapping with automatic
+     packing/unpacking of sparsely packed/smaller ring degree ciphertexts, arbitrary precision bootstrapping,
+     and advanced circuit customization/parameterization.
+
+- `lattigo/multiparty`: Package for multiparty (a.k.a. distributed or threshold) key-generation and 
+  interactive ciphertext bootstrapping with secret-shared secret keys.
+
+  - `mpckks`: Homomorphic decryption and re-encryption from and to Linear-Secret-Sharing-Shares, 
+    as well as interactive ciphertext bootstrapping for the `schemes/ckks` package.
+
+  - `mpbgv`: Homomorphic decryption and re-encryption from and to Linear-Secret-Sharing-Shares, 
+    as well as interactive ciphertext bootstrapping for the `schemes/bgv` package.
 
 - `lattigo/examples`: Executable Go programs that demonstrate the use of the Lattigo library. Each
                       subpackage includes test files that further demonstrate the use of Lattigo
                       primitives.
 
-- `lattigo/utils`: Supporting structures and functions.
+- `lattigo/utils`: Generic utility methods. This package also contains the following sub-packages:
+  - `bignum`: Arbitrary precision linear algebra and polynomial approximation.
+  - `buffer`: Efficient methods to write/read on `io.Writer` and `io.Reader`.
+  - `factorization`: Various factorization algorithms for medium-sized integers.
+  - `sampling`: Secure bytes sampling.
+  - `structs`: Generic structs for maps, vectors and matrices, including serialization.
+
+### Documentation
+
+The full documentation of the individual packages can be browsed as a web page using official
+Golang documentation rendering tool `pkgsite` or browsing the [Go doc](https://pkg.go.dev/github.com/cipherflow-fhe/lattigo).
+
+```bash
+$ go install golang.org/x/pkgsite/cmd/pkgsite@latest
+$ cd lattigo
+$ pkgsite -open .
+```
 
 ## Versions and Roadmap
 
@@ -53,69 +120,65 @@ until its version 2.4.0.
 Starting with the release of version 3.0.0, Lattigo is maintained and supported by [Tune Insight
 SA](https://tuneinsight.com).
 
-Also starting with from version 3.0.0, the module name has changed to
-github.com/tuneinsight/lattigo/v3, and the official repository has been moved to
+Also starting from version 3.0.0, the module name has changed to
+`github.com/tuneinsight/lattigo/v[X]`, and the official repository has been moved to
 https://github.com/tuneinsight/lattigo. This has the following implications for modules that depend
 on Lattigo:
 - Modules that require `github.com/ldsec/lattigo/v2` will still build correctly.
-- To upgrade to a version >= 3.0.0, depending modules must require `github.com/tuneinsight/lattigo/v3/`,
-  for example by changing the imports to `github.com/tuneinsight/lattigo/v3/[package]` and by
+- To upgrade to a version X.y.z >= 3.0.0, depending modules must require `github.com/tuneinsight/lattigo/v[X]/`,
+  for example by changing the imports to `github.com/tuneinsight/lattigo/v[X]/[package]` and by
   running `go mod tidy`.
 
-
-The current version of Lattigo, (v3.x.x) is fast-evolving and in constant development. Consequently,
+The current version of Lattigo (v6.x.x) is fast-evolving and in constant development. Consequently,
 there will still be backward-incompatible changes within this major version, in addition to many bug
-fixes and new features. Hence, we encourage all Lattigo users to update to the latest Lattigo
-version.
- 
+fixes and new features. Hence, we encourage all Lattigo users to update to the latest Lattigo version.
+
 
 See CHANGELOG.md for the current and past versions.
 
+## Pull Requests
+
+External pull requests should only be used to propose new functionalities that are substantial and would
+require a fair amount of work if done on our side. If you plan to open such a pull request, please contact
+us before doing so to make sure that the proposed changes are aligned with our development roadmap.
+
+External pull requests only proposing small or trivial changes will be converted to an issue and closed.
+
+External contributions will require the signature of a Contributor License Agreement (CLA).
+You can contact us using the following email to request a copy of the CLA: [lattigo@tuneinsight.com](mailto:lattigo@tuneinsight.com).
+
+## Vulnerability Reports 
+See [Report a Vulnerability](SECURITY.md#report-a-vulnerability).
+
+## Bug Reports
+
+Lattigo welcomes bug/regression reports of any kind that conform to the preset template, which is
+automatically generated upon creation of a new empty issue. Nonconformity will result in the issue
+being closed without acknowledgement.
+
+
 ## License
 
-Lattigo is licensed under the Apache 2.0 License. See LICENSE.
+Lattigo is licensed under the Apache 2.0 License. See [LICENSE](https://github.com/tuneinsight/lattigo/blob/master/LICENSE).
 
 ## Contact
 
-If you want to contribute to Lattigo or you have any suggestion, do not hesitate to contact us at
-[lattigo@tuneinsight.com](mailto:lattigo@tuneinsight.com).
+Before contacting us directly, please make sure that your request cannot be handled through an issue.
+
+If you want to contribute to Lattigo or report a security issue, you have a feature proposal or request, or you simply want to contact us directly, please do so using the following email: [lattigo@tuneinsight.com](mailto:lattigo@tuneinsight.com).
 
 ## Citing
 
 Please use the following BibTex entry for citing Lattigo:
 
     @misc{lattigo,
-	    title = {Lattigo v3},
+	    title = {Lattigo v6},
 	    howpublished = {Online: \url{https://github.com/tuneinsight/lattigo}},
-	    month = Apr,
-	    year = 2022,
+	    month = Aug,
+	    year = 2024,
 	    note = {EPFL-LDS, Tune Insight SA}
     }
     
-
-## References
-
-1. Efficient Bootstrapping for Approximate Homomorphic Encryption with Non-Sparse Keys
-   (<https://eprint.iacr.org/2020/1203>)
-1. Bootstrapping for Approximate Homomorphic Encryption with Negligible Failure-Probability by Using Sparse-Secret Encapsulation
-   (<https://eprint.iacr.org/2022/024>)
-1. Somewhat Practical Fully Homomorphic Encryption (<https://eprint.iacr.org/2012/144>)
-1. Multiparty Homomorphic Encryption: From Theory to Practice (<https://eprint.iacr.org/2020/304>)
-1. A Full RNS Variant of FV Like Somewhat Homomorphic Encryption Schemes
-   (<https://eprint.iacr.org/2016/510>)
-1. An Improved RNS Variant of the BFV Homomorphic Encryption Scheme
-   (<https://eprint.iacr.org/2018/117>)
-1. Homomorphic Encryption for Arithmetic of Approximate Numbers (<https://eprint.iacr.org/2016/421>)
-1. A Full RNS Variant of Approximate Homomorphic Encryption (<https://eprint.iacr.org/2018/931>)
-1. Improved Bootstrapping for Approximate Homomorphic Encryption
-   (<https://eprint.iacr.org/2018/1043>)
-1. Better Bootstrapping for Approximate Homomorphic Encryption (<https://eprint.iacr.org/2019/688>)
-1. Post-quantum key exchange - a new hope (<https://eprint.iacr.org/2015/1092>)
-1. Faster arithmetic for number-theoretic transforms (<https://arxiv.org/abs/1205.2926>)
-1. Speeding up the Number Theoretic Transform for Faster Ideal Lattice-Based Cryptography
-   (<https://eprint.iacr.org/2016/504>)
-1. Gaussian sampling in lattice-based cryptography
-   (<https://tel.archives-ouvertes.fr/tel-01245066v2>)
 
 The Lattigo logo is a lattice-based version of the original Golang mascot by [Renee
 French](http://reneefrench.blogspot.com/).

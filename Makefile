@@ -2,23 +2,11 @@
 
 .PHONY: test_gotest
 test_gotest:
-	go test -v -timeout=0 ./...
+	go clean -testcache
+	go test -timeout=0 ./...
 
-.PHONY: test_examples
-test_examples:
-	@echo Running the examples
-	go run ./examples/ring/vOLE -short > /dev/null
-	go run ./examples/bfv > /dev/null
-	go run ./examples/ckks/bootstrapping -short > /dev/null
-	go run ./examples/ckks/advanced/lut -short > /dev/null
-	go run ./examples/ckks/euler > /dev/null
-	go run ./examples/ckks/polyeval > /dev/null
-	go run ./examples/dbfv/pir &> /dev/null
-	go run ./examples/dbfv/psi &> /dev/null
-	@echo ok
-
-.PHONY: static_check
-static_check: check_tools
+.PHONY: checks
+checks: check_tools
 	@echo Checking correct formatting of files
 	
 	@FMTOUT=$$(go fmt ./...); \
@@ -47,7 +35,7 @@ static_check: check_tools
 		false;\
     fi
 	
-	@STATICCHECKOUT=$$(staticcheck -go 1.17 -checks all ./...); \
+	@STATICCHECKOUT=$$(staticcheck -go 1.24 -checks all ./...); \
 	if [ -z "$$STATICCHECKOUT" ]; then\
         echo "staticcheck: OK";\
 	else \
@@ -55,22 +43,42 @@ static_check: check_tools
 		echo "$$STATICCHECKOUT";\
 		false;\
     fi
+
+	@GOVULNCHECKOUT=$$(govulncheck ./...); \
+	if echo "$$GOVULNCHECKOUT" | grep -q "No vulnerabilities found"; then\
+		echo "govulncheck: OK";\
+    else \
+		echo "govulncheck:" >&2;\
+		echo "$$GOVULNCHECKOUT" >&2;\
+		false;\
+	fi
+
+	@GOSECOUT=$$(gosec -quiet -exclude=G602 ./...); \
+	if [ -z "$$GOSECOUT" ]; then\
+		echo "gosec: OK";\
+	else \
+		echo "gosec: problems in files:";\
+		echo "$$GOSECOUT";\
+		false;\
+	fi
 	
 	@echo Checking all local changes are committed
 	go mod tidy
 	out=`git status --porcelain`; echo "$$out"; [ -z "$$out" ]
 
 .PHONY: test
-test: test_gotest test_examples
+test: test_gotest
 
 .PHONY: ci_test
-ci_test: static_check test_gotest test_examples
+ci_test: checks test_gotest
 
-EXECUTABLES = goimports staticcheck
+EXECUTABLES = goimports staticcheck govulncheck gosec
 .PHONY: get_tools
 get_tools:
 	go install golang.org/x/tools/cmd/goimports@latest
-	go install honnef.co/go/tools/cmd/staticcheck@2022.1.1
+	go install honnef.co/go/tools/cmd/staticcheck@2025.1.1
+	go install golang.org/x/vuln/cmd/govulncheck@latest
+	go install github.com/securego/gosec/v2/cmd/gosec@latest
 
 .PHONY: check_tools
 check_tools:
