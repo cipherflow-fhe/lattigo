@@ -288,6 +288,7 @@ extern ErrorStatus CkksRotate(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHa
 extern ErrorStatus CkksConjugate(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, uint64_t* opOutCiphertextHandle);
 extern GoUint64 CkksPolyEvalStepFunction(GoUint64 evaluatorHandle, GoUint64 ciphertextHandle, GoFloat64 a, GoFloat64 b, GoInt degree, GoFloat64 threshold);
 extern ErrorStatus GetCkksResidualParameterFromBtpParameter(GoUint64 parameterHandle, uint64_t* residualParameterHandle);
+extern ErrorStatus GetCkksBootstrappingParameterFromBtpParameter(GoUint64 parameterHandle, uint64_t* bootstrappingParameterHandle);
 extern ErrorStatus CreateCkksBtpParameterFromResidualParameter(GoUint64 residualParameterHandle, uint64_t* parameterHandle);
 extern ErrorStatus GenCkksBootstrappingEvaluationKeys(GoUint64 parameterHandle, GoUint64 secretKeyHandle, uint64_t* bootstrappingEvaluationKeysHandle, uint64_t* evkN1ToN2Handle, uint64_t* evkN2ToN1Handle, uint64_t* evkDenseToSparseHandle, uint64_t* evkSparseToDenseHandle, uint64_t* evaluationKeySetHandle);
 extern ErrorStatus CreateCkksBootstrappingEvaluationKeys(GoUint64 evkN1ToN2Handle, GoUint64 evkN2ToN1Handle, GoUint64 evkDenseToSparseHandle, GoUint64 evkSparseToDenseHandle, GoUint64 evaluationKeySetHandle, uint64_t* bootstrappingEvaluationKeysHandle);

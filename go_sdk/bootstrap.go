@@ -34,6 +34,19 @@ func GetCkksResidualParameterFromBtpParameter(parameterHandle uint64, residualPa
 	return status
 }
 
+//export GetCkksBootstrappingParameterFromBtpParameter
+func GetCkksBootstrappingParameterFromBtpParameter(parameterHandle uint64, bootstrappingParameterHandle *C.uint64_t) (status C.ErrorStatus) {
+	status = okStatus()
+	defer recoverStatus(&status)
+
+	btpParams := getObject[bootstrapping.Parameters](parameterHandle)
+	// Store a copy of the value (not a pointer to a local) so the handle does
+	// not dangle after this function returns.
+	params := btpParams.BootstrappingParameters
+	*bootstrappingParameterHandle = C.uint64_t(insertObject(params))
+	return status
+}
+
 //export CreateCkksBtpParameterFromResidualParameter
 func CreateCkksBtpParameterFromResidualParameter(residualParameterHandle uint64, parameterHandle *C.uint64_t) (status C.ErrorStatus) {
 	status = okStatus()

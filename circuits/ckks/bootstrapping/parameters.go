@@ -279,13 +279,36 @@ func NewParametersFromLiteral(residualParameters ckks.Parameters, btpLit Paramet
 		/* #nosec G115 -- logqi cannot be negative */
 		g := ring.NewNTTFriendlyPrimesGenerator(uint64(logqi), NthRoot)
 
+		// @company CipherFlow
+		// The P primes (extended key-switching primes) must stay strictly below
+		// 2^logqi (bit length == logqi): the GPU backend does not support primes
+		// with bit length logqi+1 (i.e. primes >= 2^logqi). Sample them from the
+		// downstream side only.
+		isLogP := false
+		for _, lp := range LogP {
+			if lp == logqi {
+				isLogP = true
+				break
+			}
+		}
+
 		// Populates the list with primes that aren't yet in primesHave
 		primes := make([]uint64, k)
 		var i int
 		for i < k {
 
 			for {
-				qi, err := g.NextAlternatingPrime()
+				// @company CipherFlow begin ---
+				var qi uint64 
+				var err error
+				if isLogP { 
+					qi, err = g.NextDownstreamPrime() 
+				} else { 
+					qi, err = g.NextAlternatingPrime() 
+				} 
+				// @company CipherFlow end ---
+
+				// qi, err := g.NextAlternatingPrime() // @company CipherFlow
 
 				if err != nil {
 					return Parameters{}, fmt.Errorf("cannot NewParametersFromLiteral: NextAlternatingPrime for 2^{%d} +/- k*2N + 1: %w", logqi, err)
