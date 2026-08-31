@@ -1,9 +1,318 @@
-
 # Changelog
-All notable changes to this library are documented in this file. 
+All notable changes to this library are documented in this file.
 
-# [3.1.0] - UNREALEASED
+## [6.2.0]
+### Breaking Changes
+- `rlwe.Evaluator.InnerSum` does not exist anymore. It has been replaced by `rlwe.Evaluator.PartialTracesSum`, which applies the automorphisms that correspond to rotations at the scheme level (and sum the results).
 
+  **Migration**: At the scheme level, use the new `bgv.Evaluator.InnerSum`/`bgv.Evaluator.RotateAndAdd` or `ckks.Evaluator.InnerSum`/`ckks.Evaluator.RotateAndAdd` methods (see doc or below for more details). At the `rlwe` evaluator level, use `rlwe.Evaluator.PartialTracesSum`.
+- `ShallowCopy()` methods have been removed. 
+
+  **Migration**: These can safely be removed as the structures can be used concurrently. 
+- The minimum required Go version is now 1.24. 
+
+### Added 
+- Thread-safety: methods of a given structure (e.g. an evaluator) can be called concurrently. 
+- Introduction of the `bgv.Evaluator.InnerSum` and `ckks.Evaluator.InnerSum` methods, which have the same behaviour as the old `InnerSum` method for parameters `n` and `batchSize` s.t. `0 < n*batchSize <= ctIn.Slots()` divides the number of slots. Parameters not satisfying these conditions are rejected.
+- Introduction of the `bgv.Evaluator.RotateAndAdd` and `ckks.Evaluator.RotateAndAdd` methods, which have the same behaviour as the old `InnerSum` method for all parameters. 
+- Allowing to encode N values in BGV when using coefficient encoding
+
+### Improved
+- Documentation and interface of t-out-of-N MHE 
+- `SECURITY.MD` more complete and precise
+
+### Fixed 
+- Ciphertext packing before bootstrapping
+- CKKS encoding respects the `NTT` flag of the plaintext 
+- `DivRoundByLastModulus` does not overwrite the input
+- Homomorphic DFT when decomposition level has multiple matrices
+- `encryptor.encryptZeroSk` returns a ciphertext in the Montgomery domain when appropriate
+
+
+## [6.1.1] - 17.03.2025
+- Security fix: the evaluation key for switching from dense to sparse key must be generated at the lowest level.
+
+## [6.1.0] - 04.10.2024
+- Update of `PrecisionStats` in `ckks/precision.go`:  
+  - The precision is now computed as the min/max/average/... of the log of the error (instead of the log of the min/max/average/... of the error).
+  - fields renamed (`MinPrecision` -> `MINLog2Prec`, `MaxPrecision` -> `MAXLog2Prec`, ...)
+  - `rlwe.Scale` has a `.Log2()` method
+- Update of `mod1.Parameters` fields (made public, some removed)
+- Improvement of the relinearization key-generation protocol (reduce the degree of the shares)
+- Serialization of bootstrapping keys
+- Lower noise incurred by `ModUp`
+- Evaluation keys can be compressed (public element `a` can be generated from a seed)
+- More doc formatting 
+- Fix various bugs: 
+  - `ShallowCopy` of the CKKS bootstrapping evaluator and BFV evaluator not deep enough.
+  - PSI example failing 
+  - Incorrect reset of pointer in uniform sampler
+  - Error when doing inverse NTT with small degree 
+  - Mod1Evaluator changes the input ciphertext
+
+## [6.0.0] - 06.08.2024
+- Deprecated Go versions `1.18`, `1.19` and `1.20`. The minimum version is now `1.21`, due to the use of the slices of std library package.
+  - Removal of all slice utility functions in `utils/slices.go` that are provided in the standard library.
+- Golang test cache is deleted before invoking the unit test suite via `make test`.
+- Deletion of the `he` package and its abstraction layers for the BGV and CKKS, refocus of the library onto the scheme level, i.e., the `schemes` package.
+- Extraction of the homomorphic circuits from the `he` into a new `circuits` package.
+  - Simplification of the API for several circuits:
+	- Removal of the circuit-specific evaluator interfaces, e.g., `EvaluatorForLinearTransformation`. These interfaces are replaced with a scheme-agnostic evaluator in `schemes/schemes.go` due to the refocus of the Lattigo towards the individual cryptosystems.
+	- The individual homomorphic circuits are organized by schemes, in other words in the packages `circuits/bgv`, `circuits/ckks` and `circuits/common` where the latter bundles scheme-generic functionalities of circuits common to all deriving schemes.
+- Absorb the `bfv` package into the `bgv` package.
+- Rename `mhe` into `multiparty`.
+- Slot-wise permutations as part of the `LinearTransformation` circuits:
+  - Permutation are handled through `lintrans.Permutation` and `lintrans.PermutationMapping` that induce `lintrans.Diagonals` from which a regular linear transformation can be bootstrapped.
+- New ring packing API:
+  - New packing evaluator: `rlwe.RingPackingEvaluator`:
+	- `NewRingPackingEvaluator(evk *RingPackingEvaluationKey)`
+	- `Extract(ct *rlwe.Ciphertext, idx []int, naive bool) (cts map[int]*rlwe.Ciphertext, err error)`
+	- `Repack(cts map[int]*rlwe.Ciphertext, naive bool) (ct *rlwe.Ciphertext, err error)`
+	- `Split(ctN, ctEvenNHalf, ctOddNHalf *rlwe.Ciphertext) (err error)`
+	- `Merge(ctEvenNHalf, ctOddNHalf, ctN *rlwe.Ciphertext) (err error)`
+	- `ShallowCopy() *RingPackingEvaluator`
+  - New packing evaluation key:
+	- `rlwe.RingPackingEvaluationKey`
+- Streamlined unit test context generation to reduce boilerplate code duplication:
+  - `schemes/*/test_utils.go` to be reused in packages `schemes` and packages that depend on `schemes`.
+- Introduction of the `lintrans.Parameters.LevelQ` and `lintrans.Parameters.LevelP` fields and the removal of the `lintrans.Parameters.Level` field.
+- Optimizations:
+  - Reduce the number of masking operations in `rlwe.Evaluator.gadgetProductSinglePAndBitDecompLazy`.
+  - Reduce degree of relinearization key shares in `multiparty/keygen_relin.go`.
+- Add `gosec` exception directive to weak randomness in unit tests.
+- Fix various linter warnings.
+- Various docstring formatting fixes and the addition of `godoc` links through the `[]` operator.
+- Updated `README.md` with new package hierarchy figures `lattigo-hierachy.svg` and new issue policy.
+
+## [5.0.0] - 15.11.2023
+- Deprecated Go versions `1.14`, `1.15`, `1.16`, and `1.17`. The minimum version is now `1.18`, due to the required use of generics.
+- Golang Security Checker pass.
+- Dereferenced most inputs and pointers methods whenever possible. Pointers methods/inputs are now mostly used when the struct implementing the method and/or the input is intended to be modified.
+- Improved serialization interface:
+    - Low-entropy structs (such as parameters or rings) have been updated to use more compatible `json.Marshal` as underlying marshaller.
+    - High-entropy structs, such as structs storing keys or encrypted values now all satisfy the following interface:
+        - `WriteTo(io.Writer) (int64, error)`: writes the object to a standard `io.Writer` interface. The method is optimized and most efficient when writing on writers that expose their own internal buffer (see the `buffer.Writer` interface).
+        - `ReadFrom(io.Reader) (int64, error)`: reads an object from a standard `io.Reader` interface. The method is optimized and most efficient when reading from readers that expose their own internal buffers (see the `buffer.Writer` interface).
+        - `MarshalBinary() ([]byte, error)`: the previously available, standard `encoding.BinaryMarshaler` interface.
+        - `UnmarshalBinary([]byte) (error)`: the previously available, standard `encoding.BinaryUnmarshaler` interface.
+        - `BinarySize() int`: size in bytes when written to an `io.Writer` or when marshalled.
+    - Streamlined and simplified all tests related to serialization. They can now be implemented with a single line of code with `RequireSerializerCorrect` that checks the correctness of the above interface as well as equality between bites written using `WriteTo` and bytes generated using `MarshalBinary`.
+- Improved consistency across method names and across packages/schemes:
+    - All sub-strings `NoMod`, `NoModDown` and `Constant` in method names have been replaced by the sub-string `Lazy`. For example `AddNoMod` and `MulCoeffsMontgomeryConstant` become `AddLazy` and `MulCoeffsMontgomeryLazy` respectively.
+    - All sub-strings `And` in methods names have been replaced by the sub-string `Then`. For example `MulAndAdd` becomes `MulThenAdd`.
+    - All sub-strings `Inv` have been replaced by `I` for consistency. For example `InvNTT` becomes `INTT`.
+    - All sub-strings `Params` and equivalent, referring to pre-computed constants, have been replaced by `Constant`. For example `ModUpParams` becomes `ModUpConstants`.
+-  New top-level packages that provide a more convenient and streamlined user-interface to HE:
+    - `he`: Package `he` defines common high-level interfaces and implements common high-level operations in a scheme-agnostic way.
+        - The common operations in Linear Transformations
+        - The common operations in Polynomial Evaluation
+    - `he/hefloat`: Package `hefloat` implements fixed-point approximate encrypted arithmetic over real/complex numbers.
+      This package provides all the functionalities of the `schemes/ckks` package, as well as additional more advanced circuits, such as:
+        - Linear Transformations
+        - Homomorphic encoding/decoding
+        - Polynomial Evaluation
+        - Composite Minimax Polynomial Evaluation
+        - Homomorphic modular reduction (x mod 1)
+        - GoldschmidtDivision (x in [0, 2])
+        - Full domain division (x in [-max, -min] U [min, max])
+        - Sign and Step piece-wise functions (x in [-1, 1] and [0, 1] respectively)
+        - Min/Max between values in [-0.5, 0.5]
+    - `he/hefloat/bootstrapper`: Package `bootstrapper` implements bootstrapping for fixed-point approximate homomorphic encryption over the real/complex numbers.
+    It improves on the original implementation with the following features:
+        - Bootstrapping batches of ciphertexts of smaller dimension and/or with sparse packing with automatic ring-degree switching and $0$-depth packing/unpacking.
+        - Bootstrapping for the Conjugate Invariant CKKS with optimal throughput.
+        - Decorrelation between the bootstrapping parameters and residual parameters: the user doesn't need to manage two sets of parameters anymore and the user 
+          only needs to provide the residual parameters (what should remain after the evaluation of the bootstrapping circuit)
+        - Out-of-the-box usability with default parameterization independent of the residual parameters.
+        - In-depth parameterization for advanced users with 16 tunable parameters.
+        - Improved implementation of META-BTS, providing arbitrary precision bootstrapping from only one additional small prime.
+    - `he/heint`: Package `heint` implements encrypted modular arithmetic over the integers.
+        - Linear Transformations
+        - Polynomial Evaluation 
+    - `he/hebin`: Package`hebin` implements blind rotations evaluation for R-LWE schemes.
+- Moved the default parameters of all schemes to the `examples` package, where they are now referred to as **example** parameter sets to better convey the idea that they should not be used as such in real applications.
+- BFV: 
+    - The code of the package `bfv` has been replaced by a wrapper of the package `bgv` and moved to the package `schemes/bfv`.
+- BGV:
+    - The code the `bgv` package has been moved to the package `schemes/bfv`
+    - The package `bgv` has been rewritten to implement a unification of the textbook BFV and BGV schemes under a single scheme. This unification offers all the functionalities of the BFV and BGV schemes under a single scheme.
+    - Changes to the `Encoder`:
+        - `NewEncoder` now returns an `*Encoder` instead of an interface.
+        - Updated and uniformized the `Encoder` API. It now satisfies the generic `he.Encoder` interface.
+        - The encoding will be performed according to the plaintext `MetaData`.
+    - Changes to the `Evaluator`:
+        - `NewEvaluator` now returns an `*Evaluator` instead of an interface.
+        - Updated and uniformized the `Evaluator` API. It now satisfies the generic `he.Evaluator` interface.
+    - Changes to the `Parameters`:
+        - Enabled plaintext moduli with a smaller 2N-th root of unity than the ring degree.
+        - Replaced the default parameters by a single example parameter.
+        - Added a test parameter set with small plaintext modulus.
+- CKKS:
+    - The code of the `ckks` package has been moved to the package `schemes/ckks`.
+    - Changes to the `Encoder`:
+        - Enabled the encoding of plaintexts of any sparsity (previously hard-capped at a minimum of 8 slots).
+        - Unified `encoderComplex128` and `encoderBigComplex`.
+        - Updated and uniformized the `Encoder`API. It now satisfies the generic `he.Encoder` interface.
+        - The encoding will be performed according to the plaintext `MetaData`.
+    - Changes to the `Evaluator`: 
+        - `NewEvaluator` now returns an `*Evaluator` instead of an interface.
+        - Updated and uniformized the `Evaluator` API. It now satisfies the generic `he.Evaluator` interface.
+        - Improved and generalized the internal implementation of the `Evaluator` to enable arbitrary precision encrypted arithmetic.
+    - Changes to the `Parameters`:
+        - Replaced the default parameters by a single example parameter.
+        - Renamed the field `LogScale` of the `ParametersLiteralStruct` to `LogPlaintextScale`.
+    - Changes to the tests:
+        - Tests do not use the default parameters anymore but specific and optimized test parameters.
+        - Added two test parameters `TESTPREC45` for 45-bit precision and `TESTPREC90` for 90-bit precision.
+    - Others:
+        - Updated the Chebyshev interpolation with arbitrary precision arithmetic and moved the code to `utils/bignum/approximation`.
+- RLWE:
+    - The package `rlwe` has been moved to `core/rlwe`.
+    - The package `ringqp` has been moved to `ring/ringqp`.
+    - Changes to the `Parameters`:
+        - It is now possible to specify both the secret and error distributions via the `Xs` and `Xe` fields of the `ParameterLiteral` struct.
+        - Removed the concept of rotation, everything is now defined in terms of Galois elements.
+        - Renamed methods to better reflect their purpose and to generalize them.
+        - Added methods related to plaintext parameters and noise.
+        - Removed the field `Pow2Base` which is now a parameter of the struct `EvaluationKey`.
+    - Changes to the `Encryptor`:
+        - `EncryptorPublicKey` and `EncryptorSecretKey` are now public.
+        - Encryptors instantiated with a `rlwe.PublicKey` can now encrypt over `rlwe.ElementInterface[ringqp.Poly]` (i.e. generating of `rlwe.GadgetCiphertext` encryptions of zero with `rlwe.PublicKey`).
+    - Changes to the `Decryptor`:
+        - `NewDecryptor` returns a `*Decryptor` instead of an interface.
+    - Changes to the `Evaluator`:
+        - Updated all methods of the `Evaluator` to work with operands in and out of the NTT domain.
+        - Renamed `SwitchKeys` to `ApplyEvaluationKey`.
+        - Renamed `Evaluator.Merge` to `Evaluator.Pack` and generalized `Evaluator.Pack` to be able to take into account the packing `X^{N/n}` of the ciphertext.
+        - `Evaluator.Pack` is not recursive anymore and gives the option to zero (or not) slots which are not multiples of `X^{N/n}`.
+        - Added the methods `CheckAndGetGaloisKey` and `CheckAndGetRelinearizationKey` to safely check and get the corresponding `EvaluationKeys`.
+        - Added the method `InnerFunction`, which applies a user-defined bi-operand function on the Ciphertext with a tree-like combination.
+    - Changes to the Keys structs:
+        - Added `EvaluationKeySet`, which enables users to provide custom loading/saving/persistence policies and implementation for the `EvaluationKeys`.
+        - `SwitchingKey` has been renamed `EvaluationKey` to better convey that these are public keys used during the evaluation phase of a circuit. All methods and variable names have been renamed accordingly.
+        - The struct `RotationKeySet` holding a map of `SwitchingKeys` has been replaced by the struct `GaloisKey` holding a single `EvaluationKey`.
+        - The `RelinearizationKey` type now stores a single GSW-like encryption of `s^2`, which is what the schemes' relinearization methods currently support.
+    - Changes to the `KeyGenerator`:
+        - The `NewKeyGenerator` returns a `*KeyGenerator` instead of an interface.
+        - Simplified the `KeyGenerator`: methods to generate specific sets of `rlwe.GaloisKey` have been removed. Instead, the corresponding method on `rlwe.Parameters` allows to get the appropriate `GaloisElement`s.
+        - Improved the API consistency of the `rlwe.KeyGenerator`. Methods that allocate elements have the suffix `New`. Added corresponding in-place methods.
+        - It is now possible to generate `rlwe.EvaluationKey`, `rlwe.GaloisKey` and `rlwe.RelinearizationKey` at specific levels (for both `Q` and `P`) and with a specific `BaseTwoDecomposition` by passing the corresponding pre-allocated key.
+    - Changes to the `MetaData`:
+        - Content of the `MetaData` struct is now divided into `PlaintextMetaData` and `CiphertextMetaData`.
+        - `PlaintextMetaData` contains the fields:
+            - `Scale`
+            - `LogDimensions`: represents the concept of plaintext algebra dimensions (e.g. BGV/BFV = [2, n] and CKKS = [1, n/2])
+            - `IsBatched`: Boolean indicating if the plaintext is batched or not.
+        - `CiphertextMetaData` contains the fields:
+            - `IsNTT`: Boolean indicating whether the ciphertext is in the NTT domain.
+            - `IsMontgomery`: Boolean indicating whether the ciphertext is in the Montgomery domain.
+    - Changes to the tests:
+        - Added accurate noise bounds for the tests.
+        - Substantially increased the test coverage of `rlwe` (for both the amount of operations and parameters).
+        - Substantially increased the number of benchmarked operations in `rlwe`.
+    - Other changes:
+        - Added generic `Element[T]` which serves as a common underlying type for ciphertext types.
+        - The argument `level` is now optional for `NewCiphertext` and `NewPlaintext`.
+        - `EvaluationKey` (and all parent structs) and `GadgetCiphertext` now take an optional argument `rlwe.EvaluationKeyParameters` that allows to specify the level `Q` and `P` and the `BaseTwoDecomposition`.
+        - Allocating zero `rlwe.EvaluationKey`, `rlwe.GaloisKey` and `rlwe.RelinearizationKey` now takes an optional struct `rlwe.EvaluationKeyParameters` specifying the levels `Q` and `P` and the `BaseTwoDecomposition` of the key.
+        - Changed `[]*ring.Poly` to `structs.Vector[ring.Poly]` and `[]ringqp.Poly` to `structs.Vector[ringqp.Poly]`.
+        - Replaced the struct `CiphertextQP` by `Element[ringqp.Poly]`.
+        - Added basic interface description for `Parameters`, `Encryptor`, `PRNGEncryptor`, `Decryptor`, `Evaluator` and `PolynomialEvaluator`.
+        - All structs that can be serialized now implement the method V Equal(V) bool.
+        - Setting to negative values the Hamming weight of the secret or the standard deviation of the error through `NewParameters` will instantiate these fields as zero values and return a warning (as an error).
+- DRLWE:
+    - The package `drlwe` has been renamed `mhe`.
+    - Renamed:
+            - `NewCKGProtocol` to `NewPublicKeyGenProtocol`.
+            - `NewRKGProtocol` to `NewRelinKeyGenProtocol`.
+            - `NewCKSProtocol` to `NewGaloisKeyGenProtocol`.
+            - `NewRTGProtocol` to `NewKeySwitchProtocol`.
+            - `NewPCKSProtocol` to `NewPublicKeySwitchProtocol`.
+    - Replaced `[dbfv/dbfv/dckks].MaskedTransformShare` by `drlwe.RefreshShare`.
+    - Added `EvaluationKeyGenProtocol` to enable users to generate generic `rlwe.EvaluationKey` (previously only the `GaloisKey`).
+    - It is now possible to specify the levels of the modulus `Q` and `P`, as well as the `BaseTwoDecomposition` via the optional struct `rlwe.EvaluationKeyParameters`, when generating `rlwe.EvaluationKey`, `rlwe.GaloisKey` and `rlwe.RelinearizationKey`.
+    - Arbitrarily large smudging noise is now supported.
+    - Fixed `CollectiveKeySwitching` and `PublicCollectiveKeySwitching` smudging noise to not be rescaled by `P`.
+    - Tests and benchmarks in package other than the `RLWE` and `DRLWE` packages that were merely wrapper of methods of the `RLWE` or `DRLWE` have been removed and/or moved to the `RLWE` and `DRLWE` packages.
+    - Improved the GoDoc of the protocols.
+    - Added accurate noise bounds for the tests.
+- DBFV:
+    - The package `dbfv`, which was merely a wrapper of the package `dbgv`, has been removed.
+- DBGV:
+    - The package `dbgv` has been renamed `mheint` and moved to `mhe/mheint`.
+- DCKKS:
+    - The package `dckks` has been renamed `mhefloat` and moved to `mhe/mhefloat`.
+- RGSW:
+    - The package `rgsw` has been moved to `core/rgsw`.
+    - Expanded the encryptor to be able encrypt from an `rlwe.PublicKey`.
+    - Added tests for encryption and external product.
+- RING: 
+    - Changes to sampling:
+        - Updated Gaussian sampling to work with arbitrary size standard deviation and bounds.
+        - Added a generic `Sampler` interface.
+    - Added finite field polynomial interpolation.
+    - Re-enabled NTT for ring degree smaller than 16.
+    - Replaced  `Log2OfInnerSum` by `Log2OfStandardDeviation` in the `ring` package, which returns the log2 of the standard deviation of the coefficients of a polynomial.
+    - Renamed `Permute[...]` by `Automorphism[...]` in the `ring` package.
+    - Added non-NTT `Automorphism` support for the `ConjugateInvariant` ring.
+    - Replaced all prime generation methods by `NTTFriendlyPrimesGenerator` which provides a more user friendly API and better functionality.
+    - Added large standard deviation sampling.
+    - Refactoring of the `ring.Ring` object:
+        - The `ring.Ring` object is now composed of a slice of `ring.SubRings` structs, which store the pre-computations for modular arithmetic and NTT for their respective prime.
+        - The methods `ModuliChain`, `ModuliChainLength`, `MaxLevel`, `Level` have been added to the `ring.Ring` type. 
+        - Added the `BinaryMarshaller` interface implementation for `ring.Ring` types. It marshals the factors and the primitive roots, removing the need for factorization and enabling a deterministic ring reconstruction.
+        - Removed all methods with the API `[...]Lvl(level, ...)`. Instead, to perform operations at a specific level, a lower-level `ring.Ring` type can be obtained using `ring.Ring.AtLevel(level)` (which is allocation-free).
+        - Subring-level methods such as `NTTSingle` or `AddVec` are now accessible via `ring.Ring.SubRing[level].Method(*)`. Note that the consistency changes across method names also apply to these methods. For example, `NTTSingle` and `AddVec` are now simply `NTT` and `Add` when called via a `SubRing` object.
+        - Updated `ModDownQPtoQNTT` to round the RNS division (instead of flooring).
+        - The `NumberTheoreticTransformer` interface no longer has to be implemented for arbitrary `*SubRing` and it abstracts this parameterization as its instantiation.
+        - The core NTT method now takes `N` as an input, enabling NTT of different dimensions without having to modify the internal value of the ring degree in the `ring.Ring` object.
+- UTILS: 
+    - Updated methods with generics when applicable.
+    - Added public factorization methods `GetFactors`, `GetFactorPollardRho` and `GetFactorECM`.
+    - Added subpackage `sampling` which regroups the various random bytes and number generator that were previously present in the package `utils`.
+    - Added the package `utils/bignum` which provides arbitrary precision arithmetic, tools to create and evaluate polynomials, and tools to perform polynomial approximations of functions, notably Chebyshev and Multi-Interval Minimax approximations.
+    - Added subpackage `buffer` which implements custom methods to efficiently write and read slices on any writer or reader implementing a subset interface of the `bufio.Writer` and `bufio.Reader`.
+        - Added `Writer` interface and methods to write specific objects on a `Writer`.
+        - Added `Reader` interface and methods to read specific objects from a `Reader`.
+        - Added `RequireSerializerCorrect` which checks that an object satisfies `io.WriterTo`, `io.ReaderFrom`, `encoding.BinaryMarshaler` and `encoding.BinaryUnmarshaler`, and that these interfaces are correctly implemented.
+    - Added subpackage `structs`:
+        - New structs:
+            - `Map[K constraints.Integer, T any] map[K]*T`.
+            - `Matrix[T any] [][]T`.
+            - `Vector[T any] []T`.
+        - All the above structs satisfy the following interfaces:
+            - `(T) CopyNew() *T`.
+            - `(T) BinarySize() (int)`.
+            - `(T) WriteTo(io.Writer) (int64, error)`.
+            - `(T) ReadFrom(io.Reader) (int64, error)`.
+            - `(T) MarshalBinary() ([]byte, error)`.
+            - `(T) UnmarshalBinary([]byte) (error)`.
+            - `(T) Equal(T) bool`.
+    
+## [4.1.0] - 2022-11-22 
+- Further improved the generalization of the code across schemes through the `rlwe` package and the introduction of a generic scale management interface.
+- All: uniformized the `prec` type to `uint` for `*big.Float` types.
+- All: renamed `WriteTo<32/64>` to `Encode<32/64>` and `DecodePoly<32/64>` to `Decode<32/64>`, added similar method to `rlwe.Ciphertext`.
+- RLWE: added the type `rlwe.Scale`, which is now a field in the `rlwe.Parameters`.
+- RLWE: added the struct `MedaData` which stores the `Scale`, and boolean flags `IsNTT` and `IsMontgomery`. 
+- RLWE: added the field `MetaData` to the `rlwe.Plaintext`, `rlwe.Ciphertext`, `rlwe.CiphertextQP`.
+- RLWE: added `DefaultScale` and `DefaultNTTFlag` to the `rlwe.ParametersLiteral` struct. These are optional fields which are automatically set by the respective schemes.
+- RLWE: elements from `rlwe.NewPlaintext(*)` and `rlwe.NewCiphertext(*)` are given default `IsNTT` and `Scale` values taken from the `rlwe.Parameters`, which depend on the scheme used. These values can be overwritten/modified manually.
+- RLWE: added `logGap` parameter to `Evaluator.Expand`, which enables to extract only coefficients whose degree is a multiple of `2^logGap`.
+- BFV: the level of the plaintext and ciphertext must now be specified when creating them.
+- CKKS: significantly reduced the pre-computation time of the roots, especially for the arbitrary precision encoder.
+- CKKS/BGV: abstracted the scaling factor, using `rlwe.Scale`. See the description of the struct for more information.
+- BFV/BGV: added the flag `-print-noise` to print the residual noise, after decryption, during the tests.
+- BFV/BGV/CKKS: added scheme specific global constant `DefaultNTTFlag`.
+- BFV/BGV/CKKS: removed scheme-specific ciphertexts and plaintexts types. They are replaced by generic `rlwe.Ciphertext` and `rlwe.Plaintext`.
+- BFV/BGV/CKKS: removed scheme-specific `KeyGenerator`, `Encryptor` and `Decryptor`. They have been replaced by `rlwe.KeyGenerator`, `rlwe.Encryptor` and `rlwe.Decryptor`. The API go instantiate those struct from the scheme specific API, e.g. `bgv.NewEncryptor`, is still available but will return its corresponding `rlwe` struct.
+- BFV/BGV/CKKS: removed the following deprecated methods, when applicable
+    - `AddNoMod`, `AddNoModNew`, `SubNoMod`, `SubNoModNew`, `Reduce` and `ReduceNew`
+    - `PowerOf2`, `Power` and `PowerNew` which are replaced by `PolynomialBasis` and `GenPower`.
+- BFV/BGV/CKKS: the naive method algorithms for `InnerSum` and `Replicate` have been removed. The method names `InnerSumLog` and `ReplicateLog` have been replaced by `InnerSum` and `Replicate` respectively.
+
+## [4.0.0] - 2022-10-04
+- Added BGV/DBGV schemes.
 - ALL: added default parameters for LogN=11 and LogN=10.
 - RING: prime generation no longer skips the first candidate.
 - RING: reworked marshalling of `ring.Poly` object. The new available methods are:
@@ -18,8 +327,8 @@ All notable changes to this library are documented in this file.
 - RING: changed `ring.NewPoly` to take the `level` as argument instead of the number of moduli, for consistency.
 - RLWE: added several types of ciphertexts:
     - `rlwe.CiphertextQP` represents a ciphertext that is encrypted in the extended ring R_QP.
-    - `rlwe.GadgetCiphertext` represents an encryption in the extended ring R_QP of a plaintext that is decomposed in the CRT and power-of-two basis (e.g., plublic switching keys).
-- RLWE: changed representation of `rlwe.PublicKey` types which are now stored in Montgomerry form, consistently with all other key types.
+    - `rlwe.GadgetCiphertext` represents an encryption in the extended ring R_QP of a plaintext that is decomposed in the CRT and power-of-two basis (e.g., public switching keys).
+- RLWE: changed representation of `rlwe.PublicKey` types which are now stored in Montgomery form, consistently with all other key types.
 - RLWE: changed `rlwe.SwitchingKey` type to use `rlwe.GadgetCiphertext` internally.
 - RLWE: generalized `rlwe.KeySwitcher` into `rlwe.Evaluator`, which provides new functionalities:
     - `DecomposeNTT`: decomposes a polynomial modulo the special RNS basis and extends its basis from Q to QP.
@@ -49,17 +358,28 @@ All notable changes to this library are documented in this file.
 - RLWE: added the `PRNGEncryptor` type, which supports secret-key encryption from a user-specified PRNG.
 - RLWE: `rlwe.KeyGenerator` now uses an `rlwe.Encryptor` internally, to generate secret keys, encryption keys and evaluation keys.
 - RLWE: extracted the `rlwe/ringqp` sub-package which provides the `ringqp.Ring` and `ringqp.Poly` types to respectively replace the former types `rlwe.RingQP` and `rlwe.PolyQP`.
-- RGSW: added package `rgsw`, which provides a partial implementation of the RLWE-based RGSW encryption scheme. This incluides:
+- DRLWE: added the `Thresholdizer` and `Combiner` types for t-out-of-N-threshold schemes through Shamir secret-sharing.
+- DRLWE: added a `README.md` providing package overview and usage instructions.
+- DRLWE: removed the obsolete `CollectivePublicKeyGenerator`, `RelinearizationKeyGenerator`, `RotationKeyGenerator`, `PublicKeySwitchingProtocol` and `KeySwitchingProtocol` interfaces.
+- DRLWE: renamed `AggregateShare` methods to `AggregateShares`.
+- RGSW: added package `rgsw`, which provides a partial implementation of the RLWE-based RGSW encryption scheme. This includes:
     -  `rgsw.Encryptor` and the `rgsw.Ciphertext` types.
     -  `rgsw.Evaluator` to support the external product `RLWE x RGSW -> RLWE`.
     -  `rgsw/lut` sub-package that provides evaluation of Look-Up-Tables (LUT) on `rlwe.Ciphertext` types.
+- BFV: renamed `Encoder.DecodeRingT` to `Encoder.SwitchToRingT` to better reflect the purpose of the method.
+- CKKS: fixed `MulAndAdd` correctness for non-identical inputs.
+- CKKS: added `advanced.EncodingMatrixLiteral.RepackImag2Real` optional field to repack the imaginary part into the right n real slots.
+- CKKS: `Trace` now only takes as input the `logSlots` of the encrypted plaintext.
+- CKKS: replaced the public variable `.Scale` with `.scale`, it can now be accessed with `.Scale()` and set to a new value with `.SetScale()`.
+- CKKS: renamed the methods `ScalingFactor` and `SetScalingFactor` of the interface `Operand` to `Scale` and `SetScale` respectively.
+- CKKS/bootstrapping: renamed method `Bootstrapp` to `Bootstrap`.
 - BFV/CKKS: key-switching functionalities (such as rotations, relinearization and key-switching) are now all based on the `rlwe.Evaluator`.
 - BFV/CKKS: the parameters now are based on the sub-type `rlwe.Parameters`.
 - BFV/CKKS: removed deprecated methods `EncryptFromCRP` and `EncryptFromCRPNew`, users should now use the `PRNGEncryptor` interface.
 - BFV/CKKS: fixed a panic happening during the benchmark testing.
-- CKKS: fixed `MulAndAdd` correctness for non-identical inputs.
-- CKKS: added `advanced.EncodingMatrixLiteral.RepackImag2Real` optional field to repack the imaginary part into the right n real slots.
-- CKKS: `Trace` now only takes as input the `logSlots` of the encrypted plaintext.
+- DBFV/DCKKS: removed the `dbfv/dckks.CKGProtocol`, `dbfv/dckks.RKGProtocol` and `dbfv/dckks.RTGProtocol` types. Users should use the corresponding `drlwe` types instead.
+- DBFV/DCKKS: `MaskedTransformFunc` is now a struct and takes as additional input to the linear transform two Boolean flags to parameterize if the decoding/encoding process must be done before/after the linear transform.
+- DBFV/DCKKS: `refresh` and `maskedTransform` protocols now allow the user to specify the output parameters, enabling parameter switching.
 - DCKKS: fixed `dckks.RefreshProtocol` correctness when the output scale is different from the input scale.
 - Examples: added `examples/ckks/advanced/lut`, which is an example that performs homomorphic decoding -> LUT -> homomorphic encoding on a `ckks.Ciphertext`.
 - Examples: removed `examples/ckks/advanced/rlwe_lwe_bridge_LHHMQ20`, which is replaced by `examples/ckks/advanced/lut`.
@@ -133,7 +453,7 @@ All notable changes to this library are documented in this file.
 - CKKS: improved `Encoder` implementation; it is now much faster when encoding sparse plaintexts.
 - CKKS: changed the approximation intervals from `complex128` to `float64`.
 - CKKS: renamed `PtDiagMatrix` to `LinearTransform`.
-- CKKS: added `LinearTransform.Rotations()` to get the required rotation for the reciever plaintext linear tranform.
+- CKKS: added `LinearTransform.Rotations()` to get the required rotation for the receiver plaintext linear tranform.
 - CKKS: added `Parameters.RotationsForLinearTransform` to get the required rotation for the given plaintext linear tranform.
 - CKKS: added `NewLinearTransform`, `EncodeNewLinearTransform`, `GenLinearTransform` and `GenLinearTransformBSGS` to allocate and initialize plaintext linear transforms.
 - CKKS: removed plaintext linear transforms (old `PtDiagMatrix`) constructors and initializers from `Encoder`.

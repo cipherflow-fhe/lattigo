@@ -12,6 +12,8 @@
 
 #ifndef GO_CGO_GOSTRING_TYPEDEF
 typedef struct { const char *p; ptrdiff_t n; } _GoString_;
+extern size_t _GoStringLen(_GoString_ s);
+extern const char *_GoStringPtr(_GoString_ s);
 #endif
 
 #endif
@@ -19,23 +21,78 @@ typedef struct { const char *p; ptrdiff_t n; } _GoString_;
 /* Start of preamble from import "C" comments.  */
 
 
-#line 3 "main.go"
+#line 3 "objects.go"
 
-#include "../../bridge.h"
 #include <stdint.h>
+
+#line 1 "cgo-generated-wrapper"
+
+#line 3 "rlwe.go"
+
+#include <stdint.h>
+#include <stdlib.h>
+#include "../../../abi/c_types.h"
+
+#ifndef GO_SDK_ERROR_STATUS_DEFINED
+#define GO_SDK_ERROR_STATUS_DEFINED
+typedef struct ErrorStatus {
+    int code;
+    char* message;
+} ErrorStatus;
+#endif
+
+#line 1 "cgo-generated-wrapper"
+
+#line 3 "bfv.go"
+
+#include <stdint.h>
+#include <stdlib.h>
+
+#ifndef GO_SDK_ERROR_STATUS_DEFINED
+#define GO_SDK_ERROR_STATUS_DEFINED
+typedef struct ErrorStatus {
+    int code;
+    char* message;
+} ErrorStatus;
+#endif
+
+#line 1 "cgo-generated-wrapper"
+
+#line 3 "ckks.go"
+
+#include <stdint.h>
+#include <stdlib.h>
+
+#ifndef GO_SDK_ERROR_STATUS_DEFINED
+#define GO_SDK_ERROR_STATUS_DEFINED
+typedef struct ErrorStatus {
+    int code;
+    char* message;
+} ErrorStatus;
+#endif
 
 #line 1 "cgo-generated-wrapper"
 
 #line 3 "bootstrap.go"
 
 #include <stdint.h>
+#include <stdlib.h>
+
+#ifndef GO_SDK_ERROR_STATUS_DEFINED
+#define GO_SDK_ERROR_STATUS_DEFINED
+typedef struct ErrorStatus {
+    int code;
+    char* message;
+} ErrorStatus;
+#endif
 
 #line 1 "cgo-generated-wrapper"
 
 #line 3 "c_struct_import_export.go"
 
-#include "../../../abi/c_types.h"
+#include <stdint.h>
 #include <stdlib.h>
+#include "../../../abi/c_types.h"
 
 #line 1 "cgo-generated-wrapper"
 
@@ -74,9 +131,15 @@ typedef size_t GoUintptr;
 typedef float GoFloat32;
 typedef double GoFloat64;
 #ifdef _MSC_VER
+#if !defined(__cplusplus) || _MSVC_LANG <= 201402L
 #include <complex.h>
 typedef _Fcomplex GoComplex64;
 typedef _Dcomplex GoComplex128;
+#else
+#include <complex>
+typedef std::complex<float> GoComplex64;
+typedef std::complex<double> GoComplex128;
+#endif
 #else
 typedef float _Complex GoComplex64;
 typedef double _Complex GoComplex128;
@@ -104,233 +167,146 @@ typedef struct { void *data; GoInt len; GoInt cap; } GoSlice;
 extern "C" {
 #endif
 
-extern char* GetErrorMessage();
-extern GoUint64 CreateBfvParameter(GoUint64 N, GoUint64 T);
-extern GoUint64 CreateCkksParameter(GoUint64 N);
-extern GoUint64 CreateBfvParameterV2(GoUint64 T);
-extern GoUint64 CreateCkksParameterV2();
-extern GoUint64 SetBfvParameter(GoUint64 N, GoUint64 T, uint64_t* Q, GoInt q_len, uint64_t* P, GoInt p_len);
-extern GoUint64 SetCkksParameter(GoUint64 N, uint64_t* Q, GoInt q_len, uint64_t* P, GoInt p_len);
-extern GoUint64 SetCkksParameterLogSlots(GoUint64 param_handle, GoInt log_slots);
-extern GoUint64 CopyBfvParameter(GoUint64 parameter_handle);
-extern GoUint64 CopyCkksParameter(GoUint64 parameter_handle);
-extern void PrintBfvParameter(GoUint64 parameter_handle);
-extern void PrintCkksParameter(GoUint64 parameter_handle);
-extern GoUint64 GetBfvQ(GoUint64 parameter_handle, GoInt index);
-extern GoInt GetBfvQCount(GoUint64 parameter_handle);
-extern GoUint64 GetBfvP(GoUint64 parameter_handle, GoInt index);
-extern GoInt GetBfvPCount(GoUint64 parameter_handle);
-extern GoInt GetBfvN(GoUint64 parameter_handle);
-extern GoUint64 GetBfvT(GoUint64 parameter_handle);
-extern GoUint64 GetBfvContextT(GoUint64 context_handle);
-extern GoInt GetCkksN(GoUint64 parameter_handle);
-extern GoInt GetBfvMaxLevel(GoUint64 parameter_handle);
-extern GoInt GetCkksMaxLevel(GoUint64 parameter_handle);
-extern GoUint64 GetCkksP(GoUint64 parameter_handle, GoInt index);
-extern GoInt GetCkksPCount(GoUint64 parameter_handle);
-extern GoUint64 GetCkksQ(GoUint64 parameter_handle, GoInt index);
-extern GoInt GetCkksLogSlots(GoUint64 parameter_handle);
-extern GoFloat64 GetDefaultScale(GoUint64 parameter_handle);
-extern GoUint64 CreateEmptyBfvContext(GoUint64 parameter_handle);
-extern GoUint64 CreateRandomBfvContext(GoUint64 parameter_handle, GoInt level);
-extern GoUint64 CreateEmptyCkksContext(GoUint64 parameter_handle, GoUint8 support_big_complex);
-extern GoUint64 CreateRandomCkksContext(GoUint64 parameter_handle, GoInt level, GoUint8 support_big_complex);
-extern GoUint64 CreateRandomCkksContextWithSeed(GoUint64 parameter_handle, GoUint8* seed, GoUint8 support_big_complex);
-extern GoUint64 CreateCkksExtraLevelContext(GoUint64 context_handle);
-extern GoUint64 MakePublicBfvContext(GoUint64 context_handle, GoUint8 include_pk, GoUint8 include_rlk, GoUint8 include_gk);
-extern GoUint64 MakePublicCkksContext(GoUint64 context_handle, GoUint8 include_pk, GoUint8 include_rlk, GoUint8 include_gk);
-extern void GenerateBfvContextPublicKeys(GoUint64 context_handle, GoInt level);
-extern GoUint64 ShallowCopyBfvContext(GoUint64 context_handle);
-extern GoUint64 ShallowCopyCkksContext(GoUint64 context_handle);
-extern void GenBfvContextRotationKeys(GoUint64 context_handle, GoInt level);
-extern void GenBfvContextRotationKeysForRotations(GoUint64 context_handle, GoInt32* rots, GoInt rots_length, GoUint8 include_swap_rows, GoInt level);
-extern void GenCkksContextRotationKeys(GoUint64 context_handle, GoInt level);
-extern void GenCkksContextRotationKeysForRotations(GoUint64 context_handle, GoInt32* rots, GoInt rots_length, GoUint8 include_swap_rows, GoInt level);
-extern GoUint64 ExtractBfvSecretKey(GoUint64 context_handle);
-extern GoUint64 ExtractCkksSecretKey(GoUint64 context_handle);
-extern GoUint64 ExtractBfvPublicKey(GoUint64 context_handle);
-extern GoUint64 ExtractCkksPublicKey(GoUint64 context_handle);
-extern GoUint64 ExtractBfvRelinKey(GoUint64 context_handle);
-extern GoUint64 ExtractCkksRelinKey(GoUint64 context_handle);
-extern GoUint64 ExtractKeySwitchKeyFromRelinKey(GoUint64 relin_key_handle);
-extern GoInt ExtractKeySwitchKeyFromGaloisKey(GoUint64 relin_key_handle, GoUint64 k, uint64_t* key_switch_key_handle);
-extern GoUint64 ExtractBfvGaloisKey(GoUint64 context_handle);
-extern GoUint64 ExtractCkksGaloisKey(GoUint64 context_handle);
-extern void SetBfvContextSecretKey(GoUint64 context_handle, GoUint64 secret_key_handle);
-extern void SetCkksContextSecretKey(GoUint64 context_handle, GoUint64 secret_key_handle);
-extern void SetBfvContextPublicKey(GoUint64 context_handle, GoUint64 public_key_handle);
-extern void SetCkksContextPublicKey(GoUint64 context_handle, GoUint64 public_key_handle);
-extern void SetBfvContextRelinKey(GoUint64 context_handle, GoUint64 relin_key_handle);
-extern void SetCkksContextRelinKey(GoUint64 context_handle, GoUint64 relin_key_handle);
-extern void SetBfvContextGaloisKey(GoUint64 context_handle, GoUint64 galois_key_handle);
-extern void SetCkksContextGaloisKey(GoUint64 context_handle, GoUint64 galois_key_handle);
-extern GoUint64 GetBfvParameter(GoUint64 context_handle);
-extern GoUint64 GetCkksParameter(GoUint64 context_handle);
-extern GoUint64 NewBfvCiphertext(GoUint64 context_handle, GoInt degree, GoInt level);
-extern GoUint64 CopyBfvCiphertext(GoUint64 x_ciphertext_handle);
-extern GoUint64 CopyBfvCiphertextTo(GoUint64 x_ciphertext_handle, GoUint64 y_ciphertext_handle);
-extern GoUint64 CopyCkksCiphertext(GoUint64 x_ciphertext_handle);
-extern GoUint64 CopyCkksCiphertextTo(GoUint64 x_ciphertext_handle, GoUint64 y_ciphertext_handle);
-extern GoUint64 CopyCkksCiphertext3To(GoUint64 x_ciphertext_handle, GoUint64 y_ciphertext_handle);
-extern void ReleaseHandle(GoUint64 handle);
-extern GoUint64 SerializeBfvContext(GoUint64 context_handle, GoUint8** raw_data, uint64_t* length);
-extern GoUint64 DeserializeBfvContext(GoUint8* raw_data, GoUint64 length);
-extern GoUint64 SerializeBfvContextAdvanced(GoUint64 context_handle, GoUint8** raw_data, uint64_t* length);
-extern GoUint64 DeserializeBfvContextAdvanced(GoUint8* raw_data, uint64_t length);
-extern void BfvContextDecompress(GoUint64 context_handle);
-extern GoUint64 SerializeCkksContext(GoUint64 context_handle, GoUint8** raw_data, uint64_t* length);
-extern GoUint64 SerializeCkksSecretKey(GoUint64 context_handle, GoInt data_bit_length, GoUint8** raw_data, uint64_t* length);
-extern GoUint64 SerializeCkksPublicKey(GoUint64 context_handle, GoInt data_bit_length, GoUint8** raw_data, uint64_t* length);
-extern GoUint64 DeserializeCkksContext(GoUint8* raw_data, uint64_t length);
-extern GoUint64 DeserializeCkksSecretKey(GoUint8* raw_data, uint64_t length, GoInt data_bit_length);
-extern GoUint64 DeserializeCkksPublicKey(GoUint8* raw_data, uint64_t length, GoInt data_bit_length);
-extern GoUint64 SerializeCkksContextAdvanced(GoUint64 context_handle, GoUint8** raw_data, uint64_t* length);
-extern GoUint64 DeserializeCkksContextAdvanced(GoUint8* raw_data, uint64_t length);
-extern void CkksContextDecompress(GoUint64 context_handle);
-extern GoUint64 SerializeBfvCiphertext(GoUint64 ciphertext_handle, GoUint64 param_handle, GoUint8** raw_data, uint64_t* length, GoInt n_drop_bit_0, GoInt n_drop_bit_1);
-extern GoUint64 SerializeBfvCompressedCiphertext(GoUint64 ciphertext_handle, GoUint64 param_handle, GoUint8** raw_data, uint64_t* length);
-extern GoUint64 SerializeCkksCiphertext(GoUint64 ciphertext_handle, GoUint64 param_handle, GoUint8** raw_data, uint64_t* length);
-extern GoUint64 SerializeCkksCompressedCiphertext(GoUint64 ciphertext_handle, GoUint64 param_handle, GoUint8** raw_data, uint64_t* length);
-extern GoUint64 SerializeBfvPlaintextRingt(GoUint64 plaintext_handle, GoUint8** raw_data, uint64_t* length);
-extern GoUint64 DeserializeBfvPlaintextRingt(GoUint8* raw_data, uint64_t length);
-extern GoUint64 DeserializeBfvCiphertext(GoUint8* raw_data, uint64_t length);
-extern GoUint64 DeserializeBfvCompressedCiphertext(GoUint8* raw_data, uint64_t length);
-extern GoUint64 DeserializeCkksCiphertext(GoUint8* raw_data, uint64_t length);
-extern GoUint64 DeserializeCkksCompressedCiphertext(GoUint8* raw_data, uint64_t length);
-extern GoInt GetBfvCiphertextLevel(GoUint64 x_ciphertext_handle);
-extern GoUint64 GetBfvCiphertextCoeff(GoUint64 x_ciphertext_handle, GoInt poly_idx, GoInt rns_idx, GoInt coeff_idx);
-extern GoInt GetBfvCiphertext3Level(GoUint64 x_ciphertext_3_handle);
-extern GoInt GetBfvPlaintextLevel(GoUint64 x_plaintext_handle);
-extern GoInt GetBfvPlaintextRingtLevel(GoUint64 x_plaintext_ringt_handle);
-extern GoInt GetBfvPlaintextMulLevel(GoUint64 x_plaintext_mul_handle);
-extern GoInt GetCkksCiphertextLevel(GoUint64 x_ciphertext_handle);
-extern GoInt GetCkksCiphertext3Level(GoUint64 x_ciphertext_3_handle);
-extern GoInt GetCkksPlaintextLevel(GoUint64 x_plaintext_handle);
-extern GoInt GetCkksPlaintextRingtLevel(GoUint64 x_plaintext_ringt_handle);
-extern GoInt GetCkksPlaintextMulLevel(GoUint64 x_plaintext_mul_handle);
-extern GoInt GetKeySwitchKeyLevel(GoUint64 key_switch_key_handle);
-extern GoFloat64 GetCkksCiphertextScale(GoUint64 x_ciphertext_handle);
-extern GoFloat64 SetCkksCiphertextScale(GoUint64 x_ciphertext_handle, GoFloat64 scale_in);
-extern GoUint64 GetCkksPlaintextCoeff(GoUint64 x_plaintext_handle, GoInt rns_idx, GoInt coeff_idx);
-extern void SetCkksPlaintextCoeff(GoUint64 x_plaintext_handle, GoInt rns_idx, GoInt coeff_idx, GoUint64 coeff);
-extern GoInt BfvEncode(GoUint64 context_handle, uint64_t* message_array, GoInt mg_len, GoInt level, uint64_t* plaintext_handle);
-extern GoInt BfvEncodeRingt(GoUint64 context_handle, uint64_t* message_array, GoInt mg_len, uint64_t* plaintext_handle);
-extern GoUint64 BfvEncodeMul(GoUint64 context_handle, uint64_t* message_array, GoInt mg_len, GoInt level);
-extern GoUint64 BfvEncodeCoeffs(GoUint64 context_handle, uint64_t* message_array, GoInt mg_len, GoInt level);
-extern GoUint64 BfvEncodeCoeffsRingt(GoUint64 context_handle, uint64_t* message_array, GoInt mg_len);
-extern GoUint64 BfvEncodeCoeffsMul(GoUint64 context_handle, uint64_t* message_array, GoInt mg_len, GoInt level);
-extern GoUint64 CkksEncode(GoUint64 context_handle, double* message_array, GoInt mg_len, GoInt level, GoFloat64 scale);
-extern GoUint64 CkksEncodeComplex(GoUint64 context_handle, double* message_array, GoInt mg_len, GoInt level, GoFloat64 scale);
-extern GoUint64 CkksEncodeRingt(GoUint64 context_handle, double* message_array, GoInt mg_len, GoFloat64 scale);
-extern GoUint64 CkksEncodeRingtComplex(GoUint64 context_handle, double* message_array, GoInt mg_len, GoFloat64 scale);
-extern GoUint64 CkksEncodeMul(GoUint64 context_handle, double* message_array, GoInt mg_len, GoInt level, GoFloat64 scale);
-extern GoUint64 CkksEncodeMulComplex(GoUint64 context_handle, double* message_array, GoInt mg_len, GoInt level, GoFloat64 scale);
-extern GoUint64 CkksEncodeCoeffs(GoUint64 context_handle, double* message_array, GoInt mg_len, GoInt level, GoFloat64 scale);
-extern GoUint64 CkksEncodeCoeffsRingt(GoUint64 context_handle, double* message_array, GoInt mg_len, GoFloat64 scale);
-extern GoUint64 CkksEncodeCoeffsMul(GoUint64 context_handle, double* message_array, GoInt mg_len, GoInt level, GoFloat64 scale);
-extern GoUint64 BfvDecode(GoUint64 context_handle, GoUint64 plaintext_handle, uint64_t** raw_data, uint64_t* length);
-extern GoUint64 BfvDecodeRingt(GoUint64 context_handle, GoUint64 plaintext_handle, uint64_t** raw_data, uint64_t* length);
-extern GoUint64 BfvDecodeCoeffs(GoUint64 context_handle, GoUint64 plaintext_handle, uint64_t** raw_data, uint64_t* length);
-extern GoUint64 CkksDecode(GoUint64 context_handle, GoUint64 plaintext_handle, double** raw_data, uint64_t* length);
-extern GoUint64 CkksDecodeCoeffs(GoUint64 context_handle, GoUint64 plaintext_handle, double** raw_data, uint64_t* length);
-extern GoUint64 CkksRecodeBigComplex(GoUint64 context_handle, GoUint64 plaintext_handle, GoInt level, GoFloat64 scale);
-extern GoUint64 BfvEncryptAsymmetric(GoUint64 context_handle, GoUint64 plaintext_handle);
-extern GoUint64 CkksEncryptAsymmetric(GoUint64 context_handle, GoUint64 plaintext_handle);
-extern GoInt BfvEncryptSymmetric(GoUint64 context_handle, GoUint64 plaintext_handle, uint64_t* ciphertext_handle);
-extern GoInt BfvEncryptSymmetricCompressed(GoUint64 context_handle, GoUint64 plaintext_handle, uint64_t* ciphertext_handle);
-extern GoUint64 BfvCompressedCiphertextToCiphertext(GoUint64 context_handle, GoUint64 ciphertext_handle);
-extern GoUint64 CkksEncryptSymmetric(GoUint64 context_handle, GoUint64 plaintext_handle);
-extern GoUint64 CkksEncryptSymmetricCompressed(GoUint64 context_handle, GoUint64 plaintext_handle);
-extern GoUint64 CkksCompressedCiphertextToCiphertext(GoUint64 context_handle, GoUint64 ciphertext_handle);
-extern GoInt BfvDecrypt(GoUint64 context_handle, GoUint64 ciphertext_handle, uint64_t* plaintext_handle);
-extern GoUint64 CkksDecrypt(GoUint64 context_handle, GoUint64 ciphertext_handle, uint64_t* plaintext_handle);
-extern GoUint64 BfvPlaintextToPlaintextRingt(GoUint64 context_handle, GoUint64 plaintext_handle);
-extern GoUint64 BfvPlaintextRingtToPlaintextMul(GoUint64 context_handle, GoUint64 plaintext_ringt_handle, GoInt level);
-extern GoUint64 BfvPlaintextRingtToPlaintext(GoUint64 context_handle, GoUint64 plaintext_ringt_handle, GoInt level);
-extern GoUint64 CkksPlaintextRingtToPlaintextMul(GoUint64 context_handle, GoUint64 plaintext_ringt_handle, GoInt level);
-extern GoUint64 CkksPlaintextRingtToPlaintext(GoUint64 context_handle, GoUint64 plaintext_ringt_handle, GoInt level);
-extern GoInt BfvAdd(GoUint64 context_handle, GoUint64 x0_ciphertext_handle, GoUint64 x1_ciphertext_handle, uint64_t* y_ciphertext_handle);
-extern GoUint64 BfvSub(GoUint64 context_handle, GoUint64 x0_ciphertext_handle, GoUint64 x1_ciphertext_handle);
-extern GoUint64 BfvSubPlain(GoUint64 context_handle, GoUint64 x0_ciphertext_handle, GoUint64 x1_plaintext_handle);
-extern GoUint64 BfvSubPlainRingt(GoUint64 context_handle, GoUint64 x0_ciphertext_handle, GoUint64 x1_plaintext_handle);
-extern GoUint64 BfvNegate(GoUint64 context_handle, GoUint64 x0_ciphertext_handle);
-extern void AddInplace(GoUint64 context_handle, GoUint64 x0_ciphertext_handle, GoUint64 x1_ciphertext_handle);
-extern GoUint64 BfvAddPlain(GoUint64 context_handle, GoUint64 x0_ciphertext_handle, GoUint64 x1_plaintext_handle);
-extern GoUint64 BfvAddPlainRingt(GoUint64 context_handle, GoUint64 x0_ciphertext_handle, GoUint64 x1_plaintext_handle);
-extern void AddPlainInplace(GoUint64 context_handle, GoUint64 x0_ciphertext_handle, GoUint64 x1_plaintext_handle);
-extern GoUint64 CkksAdd(GoUint64 context_handle, GoUint64 x0_ciphertext_handle, GoUint64 x1_ciphertext_handle);
-extern GoUint64 CkksAddPlain(GoUint64 context_handle, GoUint64 x0_ciphertext_handle, GoUint64 x1_plaintext_handle);
-extern GoUint64 CkksSub(GoUint64 context_handle, GoUint64 x0_ciphertext_handle, GoUint64 x1_ciphertext_handle);
-extern GoUint64 CkksSubPlain(GoUint64 context_handle, GoUint64 x0_ciphertext_handle, GoUint64 x1_plaintext_handle);
-extern GoUint64 CkksAddPlainRingt(GoUint64 context_handle, GoUint64 x0_ciphertext_handle, GoUint64 x1_plaintext_handle);
-extern GoUint64 CkksSubPlainRingt(GoUint64 context_handle, GoUint64 x0_ciphertext_handle, GoUint64 x1_plaintext_handle);
-extern GoUint64 CkksNegate(GoUint64 context_handle, GoUint64 x0_ciphertext_handle);
-extern GoUint64 CkksMultByi(GoUint64 context_handle, GoUint64 x_ciphertext_handle);
-extern GoUint64 CkksDivByi(GoUint64 context_handle, GoUint64 x_ciphertext_handle);
-extern GoUint64 BfvMult(GoUint64 context_handle, GoUint64 x0_ciphertext_handle, GoUint64 x1_ciphertext_handle);
-extern GoUint64 CkksMult(GoUint64 context_handle, GoUint64 x0_ciphertext_handle, GoUint64 x1_ciphertext_handle);
-extern GoUint64 BfvMultPlain(GoUint64 context_handle, GoUint64 x0_ciphertext_handle, GoUint64 x1_plaintext_handle);
-extern GoUint64 BfvMultPlainRingt(GoUint64 context_handle, GoUint64 x0_ciphertext_handle, GoUint64 x1_plaintext_ringt_handle);
-extern GoUint64 BfvMultPlainMul(GoUint64 context_handle, GoUint64 x0_ciphertext_handle, GoUint64 x1_plaintext_mul_handle);
-extern GoUint64 BfvMultScalar(GoUint64 context_handle, GoUint64 x0_ciphertext_handle, GoInt64 x1_value);
-extern GoUint64 CkksMultPlain(GoUint64 context_handle, GoUint64 x0_ciphertext_handle, GoUint64 x1_plaintext_handle);
-extern GoUint64 CkksMultPlainMul(GoUint64 context_handle, GoUint64 x0_ciphertext_handle, GoUint64 x1_plaintext_handle);
-extern GoUint64 BfvRelinearize(GoUint64 context_handle, GoUint64 x_ciphertext3_handle);
-extern GoUint64 CkksRelinearize(GoUint64 context_handle, GoUint64 x_ciphertext3_handle);
-extern GoUint64 BfvRescale(GoUint64 context_handle, GoUint64 x_ciphertext_handle);
-extern GoUint64 CkksDropLevel(GoUint64 context_handle, GoUint64 x_ciphertext_handle, GoInt32 levels);
-extern GoUint64 CkksRescale(GoUint64 context_handle, GoUint64 x_ciphertext_handle, GoFloat64 min_scale);
-extern GoInt BfvRotateColumns(GoUint64 context_handle, GoUint64 x_ciphertext_handle, GoInt32* steps, GoInt length, uint64_t* y_ciphertext_handles);
-extern GoInt BfvAdvancedRotateColumns(GoUint64 context_handle, GoUint64 x_ciphertext_handle, GoInt32* steps, GoInt length, uint64_t* y_ciphertext_handles);
-extern GoUint64 BfvRotateRows(GoUint64 context_handle, GoUint64 x_ciphertext_handle);
-extern GoInt CkksRotate(GoUint64 context_handle, GoUint64 x_ciphertext_handle, GoInt32* steps, GoInt length, uint64_t* y_ciphertext_handles);
-extern GoUint64 CkksConjugate(GoUint64 context_handle, GoUint64 x_ciphertext_handle);
-extern GoInt CkksAdvancedRotate(GoUint64 context_handle, GoUint64 x_ciphertext_handle, GoInt32* steps, GoInt length, uint64_t* y_ciphertext_handles);
-extern GoUint64 NewCkksCiphertext(GoUint64 context_handle, GoInt degree, GoInt level, GoFloat64 scale);
-extern void PrintCkksCiphertext(GoUint64 x_ciphertext_handle);
-extern void PrintBfvCiphertext(GoUint64 x_ciphertext_handle);
-extern void PrintBfvPlaintext(GoUint64 x_plaintext_handle);
-extern void PrintMemUsage();
-extern GoUint64 CkksPolyEvalStepFunction(GoUint64 context_handle, GoUint64 x_ciphertext_handle, GoFloat64 a, GoFloat64 b, GoInt degree, GoFloat64 threshold);
-extern GoUint64 PolyEvalFunction(void* f, GoUint64 context_handle, GoUint64 x_ciphertext_handle, GoFloat64 left, GoFloat64 right, GoInt degree);
-extern GoUint64 PolyEvalReluFunction(GoUint64 context_handle, GoUint64 x_ciphertext_handle, GoFloat64 left, GoFloat64 right, GoInt degree);
-extern GoUint64 CreateCkksBtpParameter();
-extern GoUint64 CreateCkksToyBtpParameter();
-extern GoUint64 GetCkksParameterFromBtpParameter(GoUint64 parameter_handle);
-extern GoUint64 SetCkksBtpParameterLogSlots(GoUint64 param_handle, GoInt log_slots);
-extern GoUint64 CreateRandomCkksBtpContext(GoUint64 parameter_handle);
-extern void GenCkksBtpContextRotationKeys(GoUint64 context_handle);
-extern void GenCkksBtpContextRotationKeysForRotations(GoUint64 context_handle, GoInt32* rots, GoInt rots_length, GoUint8 include_swap_rows);
-extern GoUint64 ShallowCopyCkksBtpContext(GoUint64 context_handle);
-extern GoUint64 MakePublicCkksBtpContext(GoUint64 context_handle);
-extern GoUint64 GetCkksBtpParameter(GoUint64 context_handle);
-extern GoUint64 GetCkksSchemeParameter(GoUint64 context_handle);
-extern GoUint64 CkksBootstrap(GoUint64 context_handle, GoUint64 x_ciphertext_handle);
-extern GoUint64 ExtractCkksBtpSwkDtS(GoUint64 context_handle);
-extern GoUint64 ExtractCkksBtpSwkStD(GoUint64 context_handle);
-extern GoUint64 CreateEmptyCkksBtpContext(GoUint64 parameter_handle);
-extern void SetCkksBtpContextRelinKey(GoUint64 context_handle, GoUint64 relin_key_handle);
-extern void SetCkksBtpContextGaloisKey(GoUint64 context_handle, GoUint64 galois_key_handle);
-extern void SetCkksBtpContextSwitchkeyDts(GoUint64 context_handle, GoUint64 switch_key_handle);
-extern void SetCkksBtpContextSwitchkeyStd(GoUint64 context_handle, GoUint64 switch_key_handle);
-extern void CreateCkksBtpContextBootstrapper(GoUint64 context_handle);
-extern GoUint64 SerializeCkksBtpContextAdvanced(GoUint64 context_handle, GoUint8** raw_data, uint64_t* length);
-extern GoUint64 DeserializeCkksBtpContextAdvanced(GoUint8* raw_data, GoUint64 length);
-extern void ImportBfvCiphertext(GoUint64 dest_handle, CCiphertext* c_ciphertext);
-extern void ImportCkksCiphertext(GoUint64 dest_handle, CCiphertext* c_ciphertext);
-extern void ExportBfvPlaintextRingt(GoUint64 plaintext_ringt_handle, CPlaintext* c_plaintext);
-extern void ExportCkksPlaintextRingt(GoUint64 plaintext_ringt_handle, CPlaintext* c_plaintext);
-extern void ExportBfvPlaintextMul(GoUint64 parameter_handle, GoUint64 plaintext_mul_handle, GoInt mf_nbits, CPlaintext* c_plaintext);
-extern void ExportCkksPlaintextMul(GoUint64 parameter_handle, GoUint64 plaintext_mul_handle, GoInt mf_nbits, CPlaintext* c_plaintext);
-extern void ExportBfvPlaintext(GoUint64 plaintext_handle, CPlaintext* c_plaintext);
-extern void ExportCkksPlaintext(GoUint64 plaintext_handle, CPlaintext* c_plaintext);
-extern void ExportBfvCiphertext(GoUint64 ciphertext_handle, CCiphertext* c_ciphertext);
-extern void ExportCkksCiphertext(GoUint64 ciphertext_handle, CCiphertext* c_ciphertext);
-extern void ExportBfvRelinKey(GoUint64 parameter_handle, GoUint64 relin_key_handle, GoInt level, GoInt key_mf_nbits, CRelinKey* c_relin_key);
-extern void ExportCkksRelinKey(GoUint64 parameter_handle, GoUint64 relin_key_handle, GoInt level, GoInt key_mf_nbits, CRelinKey* c_relin_key);
-extern void ExportBfvGaloisKey(GoUint64 parameter_handle, GoUint64 galois_key_handle, GoInt level, GoInt key_mf_nbits, CGaloisKey* c_galois_key);
-extern void ExportCkksGaloisKey(GoUint64 parameter_handle, GoUint64 galois_key_handle, GoInt level, GoInt key_mf_nbits, CGaloisKey* c_galois_key);
-extern void ExportCkksSwitchingKey(GoUint64 parameter_handle, GoUint64 switching_key_handle, GoInt level_q, GoInt level_p, GoInt key_mf_nbits, CSwitchingKey* c_switch_key);
+extern void ReleaseHandle(GoUint64 handleID);
+extern void FreeGoString(char* s);
+extern ErrorStatus NewPlaintext(GoUint64 parameterHandle, Metadata* metadata, uint64_t* plaintextHandle);
+extern void GetPlaintextMetadata(GoUint64 plaintextHandle, Metadata* metadata);
+extern ErrorStatus SerializePlaintext(GoUint64 plaintextHandle, GoUint8** rawData, uint64_t* length, uint64_t* dataHandle);
+extern ErrorStatus DeserializePlaintext(GoUint8* rawData, uint64_t length, uint64_t* plaintextHandle);
+extern ErrorStatus NewCiphertext(GoUint64 parameterHandle, GoInt degree, GoInt level, uint64_t* ciphertextHandle);
+extern void GetCiphertextMetadata(GoUint64 ciphertextHandle, Metadata* metadata);
+extern GoFloat64 SetCiphertextScale(GoUint64 ciphertextHandle, GoFloat64 scaleIn);
+extern ErrorStatus SerializeCiphertext(GoUint64 ciphertextHandle, GoUint8** rawData, uint64_t* length, uint64_t* dataHandle);
+extern ErrorStatus DeserializeCiphertext(GoUint8* rawData, uint64_t length, uint64_t* ciphertextHandle);
+extern ErrorStatus CreateKeyGenerator(GoUint64 parameterHandle, uint64_t* keyGeneratorHandle);
+extern ErrorStatus GenSecretKey(GoUint64 keyGeneratorHandle, uint64_t* secretKeyHandle);
+extern ErrorStatus GenPublicKey(GoUint64 keyGeneratorHandle, GoUint64 secretKeyHandle, uint64_t* publicKeyHandle);
+extern ErrorStatus SerializeSecretKey(GoUint64 secretKeyHandle, GoUint8** rawData, uint64_t* length, uint64_t* dataHandle);
+extern ErrorStatus DeserializeSecretKey(GoUint8* rawData, uint64_t length, uint64_t* secretKeyHandle);
+extern ErrorStatus SerializePublicKey(GoUint64 publicKeyHandle, GoUint8** rawData, uint64_t* length, uint64_t* dataHandle);
+extern ErrorStatus DeserializePublicKey(GoUint8* rawData, uint64_t length, uint64_t* publicKeyHandle);
+extern ErrorStatus CreateEncryptorFromSecretKey(GoUint64 parameterHandle, GoUint64 secretKeyHandle, uint64_t* encryptorHandle);
+extern ErrorStatus CreateEncryptorFromPublicKey(GoUint64 parameterHandle, GoUint64 publicKeyHandle, uint64_t* encryptorHandle);
+extern ErrorStatus CreateDecryptor(GoUint64 parameterHandle, GoUint64 secretKeyHandle, uint64_t* decryptorHandle);
+extern ErrorStatus GenRelinearizationKey(GoUint64 keyGeneratorHandle, GoUint64 secretKeyHandle, GoInt level, uint64_t* relinearizationKeyHandle);
+extern ErrorStatus GenGaloisKeysForRotations(GoUint64 keyGeneratorHandle, GoUint64 secretKeyHandle, int32_t* rotations, GoInt rotationCount, GoUint8 includeConjugation, GoInt level, uint64_t* galoisElements, uint64_t* galoisKeyHandles);
+extern ErrorStatus CopyEvaluationKey(GoUint64 evaluationKeyHandle, uint64_t* targetHandle);
+extern ErrorStatus SerializeEvaluationKey(GoUint64 evaluationKeyHandle, GoUint8** rawData, uint64_t* length, uint64_t* dataHandle);
+extern ErrorStatus DeserializeEvaluationKey(GoUint8* rawData, uint64_t length, uint64_t* evaluationKeyHandle);
+extern ErrorStatus CopyRelinearizationKey(GoUint64 relinearizationKeyHandle, uint64_t* targetHandle);
+extern ErrorStatus GetRelinearizationKeyLevel(GoUint64 relinearizationKeyHandle, int* level);
+extern ErrorStatus SerializeRelinearizationKey(GoUint64 relinearizationKeyHandle, GoUint8** rawData, uint64_t* length, uint64_t* dataHandle);
+extern ErrorStatus DeserializeRelinearizationKey(GoUint8* rawData, uint64_t length, uint64_t* relinearizationKeyHandle);
+extern ErrorStatus CopyGaloisKey(GoUint64 galoisKeyHandle, uint64_t* targetHandle);
+extern ErrorStatus GetGaloisKeyElement(GoUint64 galoisKeyHandle, uint64_t* galoisElement);
+extern ErrorStatus GetGaloisKeyLevel(GoUint64 galoisKeyHandle, int* level);
+extern ErrorStatus SerializeGaloisKey(GoUint64 galoisKeyHandle, GoUint8** rawData, uint64_t* length, uint64_t* dataHandle);
+extern ErrorStatus DeserializeGaloisKey(GoUint8* rawData, uint64_t length, uint64_t* galoisKeyHandle);
+extern ErrorStatus SerializeEvaluationKeySet(GoUint64 evaluationKeySetHandle, GoUint8** rawData, uint64_t* length, uint64_t* dataHandle);
+extern ErrorStatus DeserializeEvaluationKeySet(GoUint8* rawData, uint64_t length, uint64_t* evaluationKeySetHandle);
+extern ErrorStatus GetEvaluationKeyRelinearizationKey(GoUint64 evaluationKeySetHandle, uint64_t* relinearizationKeyHandle);
+extern ErrorStatus GetEvaluationKeyGaloisKeyCount(GoUint64 evaluationKeySetHandle, int* galoisKeyCount);
+extern ErrorStatus GetEvaluationKeyGaloisKeyElements(GoUint64 evaluationKeySetHandle, uint64_t* galoisElements, GoInt galoisKeyCount);
+extern ErrorStatus GetEvaluationKeyGaloisKey(GoUint64 evaluationKeySetHandle, GoUint64 galoisElement, uint64_t* galoisKeyHandle);
+extern ErrorStatus SetEvaluationKeyRelinearizationKey(GoUint64 evaluationKeySetHandle, GoUint64 relinearizationKeyHandle);
+extern ErrorStatus SetEvaluationKeyGaloisKey(GoUint64 evaluationKeySetHandle, GoUint64 galoisKeyHandle);
+extern ErrorStatus SetEvaluationKeyGaloisKeys(GoUint64 evaluationKeySetHandle, uint64_t* galoisKeyHandles, GoInt galoisKeyCount);
+extern ErrorStatus CreateEvaluationKeySet(GoUint64 relinearizationKeyHandle, uint64_t* galoisKeyHandles, GoInt galoisKeyCount, uint64_t* evaluationKeySetHandle);
+extern ErrorStatus CreateBfvDefaultParameter(GoInt logN, GoUint64 T, uint64_t* parameterHandle);
+extern ErrorStatus CreateBfvCustomParameter(GoInt logN, GoUint64 T, uint64_t* q, GoInt qLen, uint64_t* p, GoInt pLen, uint64_t* parameterHandle);
+extern ErrorStatus CopyBfvParameter(GoUint64 parameterHandle, uint64_t* targetHandle);
+extern ErrorStatus SerializeBfvParameter(GoUint64 parameterHandle, GoUint8** rawData, uint64_t* length, uint64_t* dataHandle);
+extern ErrorStatus DeserializeBfvParameter(GoUint8* rawData, uint64_t length, uint64_t* parameterHandle);
+extern ErrorStatus PrintBfvParameter(GoUint64 parameterHandle);
+extern ErrorStatus GetBfvN(GoUint64 parameterHandle, int* n);
+extern ErrorStatus GetBfvLogN(GoUint64 parameterHandle, int* logN);
+extern ErrorStatus GetBfvMaxLevel(GoUint64 parameterHandle, int* maxLevel);
+extern ErrorStatus GetBfvQ(GoUint64 parameterHandle, uint64_t* rawData);
+extern ErrorStatus GetBfvP(GoUint64 parameterHandle, uint64_t* rawData, uint64_t* length);
+extern ErrorStatus GetBfvT(GoUint64 parameterHandle, uint64_t* t);
+extern ErrorStatus CreateBfvEncoder(GoUint64 parameterHandle, uint64_t* encoderHandle);
+extern ErrorStatus CreateBfvEvaluator(GoUint64 parameterHandle, GoUint64 evaluationKeySetHandle, uint64_t* evaluatorHandle);
+extern ErrorStatus SetBfvEvaluatorEvaluationKeySet(GoUint64 evaluatorHandle, GoUint64 evaluationKeySetHandle);
+extern GoUint64 CopyBfvCiphertext(GoUint64 ciphertextHandle);
+extern GoUint64 CopyBfvCiphertextTo(GoUint64 xCiphertextHandle, GoUint64 yCiphertextHandle);
+extern ErrorStatus BfvEncode(GoUint64 encoderHandle, uint64_t* messageArray, GoInt messageLen, GoUint64 plaintextHandle);
+extern ErrorStatus BfvDecode(GoUint64 encoderHandle, GoUint64 plaintextHandle, uint64_t** rawData, uint64_t* length, uint64_t* dataHandle);
+extern ErrorStatus BfvEncrypt(GoUint64 encryptorHandle, GoUint64 plaintextHandle, uint64_t* ciphertextHandle);
+extern ErrorStatus BfvDecrypt(GoUint64 decryptorHandle, GoUint64 ciphertextHandle, uint64_t* plaintextHandle);
+extern ErrorStatus BfvAdd(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, GoUint64 op1OperandHandle, uint64_t* opOutCiphertextHandle);
+extern ErrorStatus BfvAddScalarInt(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, GoInt op1Value, uint64_t* opOutCiphertextHandle);
+extern ErrorStatus BfvAddScalar(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, GoInt64 op1Value, uint64_t* opOutCiphertextHandle);
+extern ErrorStatus BfvAddScalarUint(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, GoUint64 op1Value, uint64_t* opOutCiphertextHandle);
+extern ErrorStatus BfvSub(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, GoUint64 op1OperandHandle, uint64_t* opOutCiphertextHandle);
+extern ErrorStatus BfvSubScalarInt(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, GoInt op1Value, uint64_t* opOutCiphertextHandle);
+extern ErrorStatus BfvSubScalar(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, GoInt64 op1Value, uint64_t* opOutCiphertextHandle);
+extern ErrorStatus BfvSubScalarUint(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, GoUint64 op1Value, uint64_t* opOutCiphertextHandle);
+extern ErrorStatus BfvMult(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, GoUint64 op1OperandHandle, uint64_t* opOutCiphertextHandle);
+extern ErrorStatus BfvMultScalarInt(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, GoInt op1Value, uint64_t* opOutCiphertextHandle);
+extern ErrorStatus BfvMultScalar(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, GoInt64 op1Value, uint64_t* opOutCiphertextHandle);
+extern ErrorStatus BfvMultScalarUint(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, GoUint64 op1Value, uint64_t* opOutCiphertextHandle);
+extern ErrorStatus BfvRelinearize(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, uint64_t* opOutCiphertextHandle);
+extern ErrorStatus BfvDropLevel(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, GoInt32 levels, uint64_t* opOutCiphertextHandle);
+extern ErrorStatus BfvRescale(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, uint64_t* opOutCiphertextHandle);
+extern ErrorStatus BfvRotateColumns(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, int32_t* steps, GoInt length, uint8_t useDefaultRotationKeys, uint64_t* opOutCiphertextHandles);
+extern ErrorStatus BfvRotateRows(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, uint64_t* opOutCiphertextHandle);
+extern ErrorStatus CreateCkksDefaultParameter(GoInt logN, uint64_t* parameterHandle);
+extern ErrorStatus CreateCkksCustomParameter(GoInt logN, GoInt logDefaultScale, uint64_t* q, GoInt qLen, uint64_t* p, GoInt pLen, uint64_t* parameterHandle);
+extern ErrorStatus CopyCkksParameter(GoUint64 parameterHandle, uint64_t* targetHandle);
+extern ErrorStatus SerializeCkksParameter(GoUint64 parameterHandle, GoUint8** rawData, uint64_t* length, uint64_t* dataHandle);
+extern ErrorStatus DeserializeCkksParameter(GoUint8* rawData, uint64_t length, uint64_t* parameterHandle);
+extern ErrorStatus PrintCkksParameter(GoUint64 parameterHandle);
+extern ErrorStatus GetCkksN(GoUint64 parameterHandle, int* n);
+extern ErrorStatus GetCkksLogN(GoUint64 parameterHandle, int* logN);
+extern ErrorStatus GetCkksMaxLevel(GoUint64 parameterHandle, int* maxLevel);
+extern ErrorStatus GetCkksQ(GoUint64 parameterHandle, uint64_t* rawData);
+extern ErrorStatus GetCkksP(GoUint64 parameterHandle, uint64_t* rawData, uint64_t* length);
+extern ErrorStatus GetCkksLogMaxSlots(GoUint64 parameterHandle, int* logMaxSlots);
+extern ErrorStatus GetCkksMaxSlots(GoUint64 parameterHandle, int* maxSlots);
+extern ErrorStatus GetCkksDefaultScale(GoUint64 parameterHandle, double* defaultScale);
+extern ErrorStatus GetCkksLogDefaultScale(GoUint64 parameterHandle, int* logDefaultScale);
+extern ErrorStatus CreateCkksEncoder(GoUint64 parameterHandle, uint64_t* encoderHandle);
+extern ErrorStatus CreateCkksEvaluator(GoUint64 parameterHandle, GoUint64 evaluationKeySetHandle, uint64_t* evaluatorHandle);
+extern ErrorStatus SetCkksEvaluatorEvaluationKeySet(GoUint64 evaluatorHandle, GoUint64 evaluationKeySetHandle);
+extern GoUint64 CopyCkksCiphertext(GoUint64 ciphertextHandle);
+extern GoUint64 CopyCkksCiphertextTo(GoUint64 xCiphertextHandle, GoUint64 yCiphertextHandle);
+extern ErrorStatus CkksEncodeReal(GoUint64 encoderHandle, double* messageArray, GoInt messageLen, GoUint64 plaintextHandle);
+extern ErrorStatus CkksEncodeComplex(GoUint64 encoderHandle, double* messageArray, GoInt messageLen, GoUint64 plaintextHandle);
+extern ErrorStatus CkksDecode(GoUint64 encoderHandle, GoUint64 plaintextHandle, double** rawData, uint64_t* length, uint64_t* dataHandle);
+extern ErrorStatus CkksEncrypt(GoUint64 encryptorHandle, GoUint64 plaintextHandle, uint64_t* ciphertextHandle);
+extern ErrorStatus CkksDecrypt(GoUint64 decryptorHandle, GoUint64 ciphertextHandle, uint64_t* plaintextHandle);
+extern ErrorStatus CkksAdd(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, GoUint64 op1OperandHandle, uint64_t* opOutCiphertextHandle);
+extern ErrorStatus CkksAddScalar(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, GoFloat64 op1Real, GoFloat64 op1Imag, uint64_t* opOutCiphertextHandle);
+extern ErrorStatus CkksSub(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, GoUint64 op1OperandHandle, uint64_t* opOutCiphertextHandle);
+extern ErrorStatus CkksSubScalar(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, GoFloat64 op1Real, GoFloat64 op1Imag, uint64_t* opOutCiphertextHandle);
+extern ErrorStatus CkksMul(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, GoUint64 op1OperandHandle, uint64_t* opOutCiphertextHandle);
+extern ErrorStatus CkksMulScalar(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, GoFloat64 op1Real, GoFloat64 op1Imag, uint64_t* opOutCiphertextHandle);
+extern ErrorStatus CkksRelinearize(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, uint64_t* opOutCiphertextHandle);
+extern ErrorStatus CkksDropLevel(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, GoInt32 levels, uint64_t* opOutCiphertextHandle);
+extern ErrorStatus CkksRescale(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, uint64_t* opOutCiphertextHandle);
+extern ErrorStatus CkksRotate(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, int32_t* steps, GoInt length, uint8_t useDefaultRotationKeys, uint64_t* opOutCiphertextHandles);
+extern ErrorStatus CkksConjugate(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, uint64_t* opOutCiphertextHandle);
+extern GoUint64 CkksPolyEvalStepFunction(GoUint64 evaluatorHandle, GoUint64 ciphertextHandle, GoFloat64 a, GoFloat64 b, GoInt degree, GoFloat64 threshold);
+extern ErrorStatus GetCkksResidualParameterFromBtpParameter(GoUint64 parameterHandle, uint64_t* residualParameterHandle);
+extern ErrorStatus GetCkksBootstrappingParameterFromBtpParameter(GoUint64 parameterHandle, uint64_t* bootstrappingParameterHandle);
+extern ErrorStatus CreateCkksBtpParameterFromResidualParameter(GoUint64 residualParameterHandle, uint64_t* parameterHandle);
+extern ErrorStatus GenCkksBootstrappingEvaluationKeys(GoUint64 parameterHandle, GoUint64 secretKeyHandle, uint64_t* bootstrappingEvaluationKeysHandle, uint64_t* evkN1ToN2Handle, uint64_t* evkN2ToN1Handle, uint64_t* evkDenseToSparseHandle, uint64_t* evkSparseToDenseHandle, uint64_t* evaluationKeySetHandle);
+extern ErrorStatus CreateCkksBootstrappingEvaluationKeys(GoUint64 evkN1ToN2Handle, GoUint64 evkN2ToN1Handle, GoUint64 evkDenseToSparseHandle, GoUint64 evkSparseToDenseHandle, GoUint64 evaluationKeySetHandle, uint64_t* bootstrappingEvaluationKeysHandle);
+extern ErrorStatus GetCkksBootstrappingEvaluationKeys(GoUint64 bootstrappingEvaluationKeysHandle, uint64_t* evkN1ToN2Handle, uint64_t* evkN2ToN1Handle, uint64_t* evkDenseToSparseHandle, uint64_t* evkSparseToDenseHandle, uint64_t* evaluationKeySetHandle);
+extern ErrorStatus SerializeCkksBootstrappingEvaluationKeys(GoUint64 bootstrappingEvaluationKeysHandle, GoUint8** rawData, uint64_t* length, uint64_t* dataHandle);
+extern ErrorStatus DeserializeCkksBootstrappingEvaluationKeys(GoUint8* rawData, uint64_t length, uint64_t* bootstrappingEvaluationKeysHandle);
+extern ErrorStatus SetCkksBootstrappingEvaluationKeySet(GoUint64 bootstrappingEvaluationKeysHandle, GoUint64 evaluationKeySetHandle);
+extern ErrorStatus SetCkksBootstrappingEvaluationKeyN1ToN2(GoUint64 bootstrappingEvaluationKeysHandle, GoUint64 evaluationKeyHandle);
+extern ErrorStatus SetCkksBootstrappingEvaluationKeyN2ToN1(GoUint64 bootstrappingEvaluationKeysHandle, GoUint64 evaluationKeyHandle);
+extern ErrorStatus SetCkksBootstrappingEvaluationKeyDenseToSparse(GoUint64 bootstrappingEvaluationKeysHandle, GoUint64 evaluationKeyHandle);
+extern ErrorStatus SetCkksBootstrappingEvaluationKeySparseToDense(GoUint64 bootstrappingEvaluationKeysHandle, GoUint64 evaluationKeyHandle);
+extern ErrorStatus CreateCkksBtpEvaluator(GoUint64 parameterHandle, GoUint64 bootstrappingEvaluationKeysHandle, uint64_t* evaluatorHandle);
+extern ErrorStatus CkksBootstrap(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, uint64_t* opOutCiphertextHandle);
+extern ErrorStatus CkksBootstrapMany(GoUint64 evaluatorHandle, uint64_t* op0CiphertextHandles, GoInt op0Count, uint64_t* opOutCiphertextHandles);
+extern ErrorStatus ImportCiphertext(GoUint64 parameterHandle, GoUint64 destHandle, Metadata* sourceMetadata, Metadata* targetMetadata, CCiphertext* cCiphertext);
+extern void ExportPlaintext(GoUint64 parameterHandle, GoUint64 plaintextHandle, Metadata* metadata, CPlaintext* plaintext);
+extern void ExportCiphertext(GoUint64 parameterHandle, GoUint64 ciphertextHandle, Metadata* metadata, CCiphertext* ciphertext);
+extern void ExportEvaluationKey(GoUint64 parameterHandle, GoUint64 evaluationKeyHandle, GoInt levelP, Metadata* metadata, CEvaluationKey* evaluationKey);
 extern void BfvPolyNttInplace(GoUint64 parameter_handle, uint64_t* data, GoInt level_q, GoInt level_p);
 extern void BfvPolyInvNttInplace(GoUint64 parameter_handle, uint64_t* data, GoInt level_q, GoInt level_p);
 extern void BfvPolyMulByPow2Inplace(GoUint64 parameter_handle, uint64_t* data, GoInt level_q, GoInt level_p, GoInt pow2);

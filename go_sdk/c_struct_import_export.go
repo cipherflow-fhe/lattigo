@@ -1,269 +1,337 @@
 package main
 
 /*
-#include "../../../abi/c_types.h"
+#include <stdint.h>
 #include <stdlib.h>
+#include "../../../abi/c_types.h"
 */
 import "C"
+
 import (
+	"fmt"
+	"math/big"
+	"runtime/cgo"
 	"unsafe"
 
-	"github.com/cipherflow-fhe/lattigo/bfv"
-	"github.com/cipherflow-fhe/lattigo/ckks"
+	"github.com/cipherflow-fhe/lattigo/core/rlwe"
 	"github.com/cipherflow-fhe/lattigo/ring"
-	"github.com/cipherflow-fhe/lattigo/rlwe"
-	"github.com/cipherflow-fhe/lattigo/rlwe/ringqp"
+	"github.com/cipherflow-fhe/lattigo/ring/ringqp"
 )
 
-func malloc_uint64s(n int) *C.uint64_t {
-	return (*C.uint64_t)(C.malloc(C.size_t(n) * C.size_t(unsafe.Sizeof(C.uint64_t(0)))))
+func mallocUint64s(n int) *C.uint64_t {
+	if n <= 0 {
+		return nil
+	}
+	return (*C.uint64_t)(C.calloc(C.size_t(n), C.size_t(unsafe.Sizeof(C.uint64_t(0)))))
 }
 
-func uint64_ptr_at(data *C.uint64_t, offset int) *C.uint64_t {
+func uint64PtrAt(data *C.uint64_t, offset int) *C.uint64_t {
 	return (*C.uint64_t)(unsafe.Pointer(uintptr(unsafe.Pointer(data)) + uintptr(offset)*unsafe.Sizeof(C.uint64_t(0))))
 }
 
-func uint64_slice(data *C.uint64_t, n int) []uint64 {
+func uint64Slice(data *C.uint64_t, n int) []uint64 {
+	if data == nil || n <= 0 {
+		return nil
+	}
 	return unsafe.Slice((*uint64)(unsafe.Pointer(data)), n)
 }
 
-func ring_degree(src *ring.Poly) int {
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func ringDegree(src ring.Poly) int {
+	if len(src.Coeffs) == 0 {
+		return 0
+	}
 	return len(src.Coeffs[0])
 }
 
-func switching_key_ring_degree(src *rlwe.SwitchingKey) int {
-	return len(src.Value[0][0].Value[0].Q.Coeffs[0])
-}
-
-func switching_key_decomp_rns(level_q int, level_p int) int {
-	return (level_q + level_p + 1) / (level_p + 1)
-}
-
-func poly_view_from_flat_rns(data *C.uint64_t, rns_size int, ring_degree int) *ring.Poly {
-	poly := &ring.Poly{Coeffs: make([][]uint64, rns_size)}
-	for rns_idx := 0; rns_idx < rns_size; rns_idx++ {
-		poly.Coeffs[rns_idx] = uint64_slice(uint64_ptr_at(data, rns_idx*ring_degree), ring_degree)
+func polyViewFromFlatRNS(data *C.uint64_t, rnsSize int, ringDegree int) ring.Poly {
+	poly := ring.Poly{Coeffs: make([][]uint64, rnsSize)}
+	for rnsIdx := 0; rnsIdx < rnsSize; rnsIdx++ {
+		poly.Coeffs[rnsIdx] = uint64Slice(uint64PtrAt(data, rnsIdx*ringDegree), ringDegree)
 	}
 	return poly
 }
 
-func export_plaintext_poly(src *ring.Poly, dest *C.CPlaintext) {
-	level := src.Level()
-	ring_degree := ring_degree(src)
-	rns_size := level + 1
+func exportQPPoly(src ringqp.Poly, data *C.uint64_t, levelQ int, levelP int, ringDegree int) {
+	qSize := levelQ + 1
+	pSize := 0
+	if levelP >= 0 {
+		pSize = levelP + 1
+	}
 
-	dest.level = C.int(level)
-	dest.ring_degree = C.int(ring_degree)
-	dest.data = malloc_uint64s(rns_size * ring_degree)
-
-	for rns_idx := 0; rns_idx < rns_size; rns_idx++ {
-		copy(uint64_slice(uint64_ptr_at(dest.data, rns_idx*ring_degree), ring_degree), src.Coeffs[rns_idx])
+	for rnsIdx := 0; rnsIdx < minInt(qSize, len(src.Q.Coeffs)); rnsIdx++ {
+		copy(uint64Slice(uint64PtrAt(data, rnsIdx*ringDegree), ringDegree), src.Q.Coeffs[rnsIdx])
+	}
+	for rnsIdx := 0; rnsIdx < minInt(pSize, len(src.P.Coeffs)); rnsIdx++ {
+		copy(uint64Slice(uint64PtrAt(data, (qSize+rnsIdx)*ringDegree), ringDegree), src.P.Coeffs[rnsIdx])
 	}
 }
 
-func import_ciphertext_polys(src *C.CCiphertext, dest []*ring.Poly) {
-	cipher_size := int(src.cipher_size)
-	level := int(src.level)
-	ring_degree := int(src.ring_degree)
-	rns_size := level + 1
-
-	for poly_idx := 0; poly_idx < cipher_size; poly_idx++ {
-		for rns_idx := 0; rns_idx < rns_size; rns_idx++ {
-			offset := (poly_idx*rns_size + rns_idx) * ring_degree
-			copy(dest[poly_idx].Coeffs[rns_idx], uint64_slice(uint64_ptr_at(src.data, offset), ring_degree))
-		}
+func mulByPow2(r *ring.Ring, poly ring.Poly, pow2 int) {
+	if r == nil || pow2 <= 0 || poly.Level() < 0 {
+		return
 	}
+	scalar := new(big.Int).Lsh(big.NewInt(1), uint(pow2))
+	r.AtLevel(poly.Level()).MulScalarBigint(poly, scalar, poly)
 }
 
-func export_ciphertext_polys(src []*ring.Poly, level int, cipher_size int, dest *C.CCiphertext) {
-	ring_degree := ring_degree(src[0])
-	rns_size := level + 1
-
-	dest.level = C.int(level)
-	dest.cipher_size = C.int(cipher_size)
-	dest.ring_degree = C.int(ring_degree)
-	dest.data = malloc_uint64s(cipher_size * rns_size * ring_degree)
-
-	for poly_idx := 0; poly_idx < cipher_size; poly_idx++ {
-		for rns_idx := 0; rns_idx < rns_size; rns_idx++ {
-			offset := (poly_idx*rns_size + rns_idx) * ring_degree
-			copy(uint64_slice(uint64_ptr_at(dest.data, offset), ring_degree), src[poly_idx].Coeffs[rns_idx])
-		}
-	}
-}
-
-func export_qp_poly(src *ringqp.Poly, data *C.uint64_t, level_q int, level_p int, ring_degree int) {
-	q_size := level_q + 1
-	p_size := level_p + 1
-	for rns_idx := 0; rns_idx < q_size; rns_idx++ {
-		copy(uint64_slice(uint64_ptr_at(data, rns_idx*ring_degree), ring_degree), src.Q.Coeffs[rns_idx])
-	}
-	for rns_idx := 0; rns_idx < p_size; rns_idx++ {
-		copy(uint64_slice(uint64_ptr_at(data, (q_size+rns_idx)*ring_degree), ring_degree), src.P.Coeffs[rns_idx])
-	}
-}
-
-func export_switching_key(params rlwe.Parameters, src *rlwe.SwitchingKey, dest *C.CSwitchingKey, level_q int, level_p int, mf_nbits int) {
-	ring_degree := switching_key_ring_degree(src)
-	decomp_rns := switching_key_decomp_rns(level_q, level_p)
-
-	q_size := level_q + 1
-	p_size := level_p + 1
-	rns_size := q_size + p_size
-
-	dest.level_q = C.int(level_q)
-	dest.level_p = C.int(level_p)
-	dest.ring_degree = C.int(ring_degree)
-	dest.data = malloc_uint64s(decomp_rns * 2 * rns_size * ring_degree)
-
-	for decomp_idx := 0; decomp_idx < decomp_rns; decomp_idx++ {
-		for poly_idx := 0; poly_idx < 2; poly_idx++ {
-			offset := ((decomp_idx*2 + poly_idx) * rns_size) * ring_degree
-			export_qp_poly(&src.Value[decomp_idx][0].Value[poly_idx], uint64_ptr_at(dest.data, offset), level_q, level_p, ring_degree)
-		}
-	}
-
-	diff := mf_nbits - 64
-	if diff == 0 {
+func transformNTT(r *ring.Ring, poly ring.Poly, sourceIsNTT bool, targetIsNTT bool) {
+	if r == nil || sourceIsNTT == targetIsNTT || poly.Level() < 0 {
 		return
 	}
 
-	ringq := params.RingQ()
-	ringp := params.RingP()
-	for decomp_idx := 0; decomp_idx < decomp_rns; decomp_idx++ {
-		for poly_idx := 0; poly_idx < 2; poly_idx++ {
-			offset := ((decomp_idx*2 + poly_idx) * rns_size) * ring_degree
-			q_poly := poly_view_from_flat_rns(uint64_ptr_at(dest.data, offset), q_size, ring_degree)
-			p_poly := poly_view_from_flat_rns(uint64_ptr_at(dest.data, offset+q_size*ring_degree), p_size, ring_degree)
+	rlvl := r.AtLevel(poly.Level())
+	if targetIsNTT {
+		rlvl.NTT(poly, poly)
+	} else {
+		rlvl.INTT(poly, poly)
+	}
+}
 
-			if diff == -64 {
-				ringq.InvMForm(q_poly, q_poly)
-				ringp.InvMForm(p_poly, p_poly)
-			} else if diff > 0 {
-				ringq.MulByPow2(q_poly, diff, q_poly)
-				ringp.MulByPow2(p_poly, diff, p_poly)
-			} else {
-				ringq.InvMFormAndMulByPow2(q_poly, 64+diff, q_poly)
-				ringp.InvMFormAndMulByPow2(p_poly, 64+diff, p_poly)
+func transformMontgomeryBits(r *ring.Ring, poly ring.Poly, sourceMFNBits int, targetMFNBits int) {
+	diff := targetMFNBits - sourceMFNBits
+	if r == nil || diff == 0 || poly.Level() < 0 {
+		return
+	}
+
+	rlvl := r.AtLevel(poly.Level())
+	if diff == -64 {
+		rlvl.IMForm(poly, poly)
+	} else if diff > 0 {
+		mulByPow2(rlvl, poly, diff)
+	} else {
+		rlvl.IMForm(poly, poly)
+		mulByPow2(rlvl, poly, 64+diff)
+	}
+}
+
+func exportEvaluationKey(params *rlwe.Parameters, src *rlwe.EvaluationKey, dest *C.CEvaluationKey, levelP int, metadata *C.Metadata) {
+	if src == nil || len(src.Value) == 0 || len(src.Value[0]) == 0 || len(src.Value[0][0]) == 0 {
+		dest.level_q = C.int(0)
+		dest.level_p = C.int(0)
+		dest.ring_degree = C.int(0)
+		dest.data = nil
+		return
+	}
+
+	levelQ := src.LevelQ()
+	if metadata != nil {
+		levelQ = minInt(int(metadata.level), src.LevelQ())
+	}
+	levelP = minInt(levelP, src.LevelP())
+	if levelP < -1 {
+		levelP = src.LevelP()
+	}
+
+	ringDegree := src.Value[0][0][0].Q.N()
+	decompRNS := params.BaseRNSDecompositionVectorSize(levelQ, levelP)
+	decompRNS = minInt(decompRNS, len(src.Value))
+	qSize := levelQ + 1
+	pSize := 0
+	if levelP >= 0 {
+		pSize = levelP + 1
+	}
+	rnsSize := qSize + pSize
+
+	dest.level_q = C.int(levelQ)
+	dest.level_p = C.int(levelP)
+	dest.ring_degree = C.int(ringDegree)
+	dest.data = mallocUint64s(decompRNS * 2 * rnsSize * ringDegree)
+
+	for decompIdx := 0; decompIdx < decompRNS; decompIdx++ {
+		if len(src.Value[decompIdx]) == 0 {
+			continue
+		}
+		polys := src.Value[decompIdx][0]
+		for polyIdx := 0; polyIdx < minInt(2, len(polys)); polyIdx++ {
+			offset := ((decompIdx*2 + polyIdx) * rnsSize) * ringDegree
+			exportQPPoly(polys[polyIdx], uint64PtrAt(dest.data, offset), levelQ, levelP, ringDegree)
+		}
+	}
+
+	if metadata == nil {
+		return
+	}
+
+	sourceIsNTT := true
+	sourceMFormBits := 64
+	targetIsNTT := metadata.is_ntt != 0
+	targetMFormBits := int(metadata.mform_bits)
+	if sourceIsNTT == targetIsNTT && sourceMFormBits == targetMFormBits {
+		return
+	}
+
+	ringQ := params.RingQ()
+	ringP := params.RingP()
+	for decompIdx := 0; decompIdx < decompRNS; decompIdx++ {
+		for polyIdx := 0; polyIdx < 2; polyIdx++ {
+			offset := ((decompIdx*2 + polyIdx) * rnsSize) * ringDegree
+			qPoly := polyViewFromFlatRNS(uint64PtrAt(dest.data, offset), qSize, ringDegree)
+			transformNTT(ringQ, qPoly, sourceIsNTT, targetIsNTT)
+			transformMontgomeryBits(ringQ, qPoly, sourceMFormBits, targetMFormBits)
+
+			if pSize > 0 {
+				pPoly := polyViewFromFlatRNS(uint64PtrAt(dest.data, offset+qSize*ringDegree), pSize, ringDegree)
+				transformNTT(ringP, pPoly, sourceIsNTT, targetIsNTT)
+				transformMontgomeryBits(ringP, pPoly, sourceMFormBits, targetMFormBits)
 			}
 		}
 	}
 }
 
-func export_galois_key(params rlwe.Parameters, src *rlwe.RotationKeySet, dest *C.CGaloisKey, level int, mf_nbits int) {
-	n_switching_key := int(dest.n_switching_key)
-	galois_elements := unsafe.Slice(dest.galois_elements, n_switching_key)
-	level_p := src.Keys[uint64(galois_elements[0])].LevelP()
+//export ImportCiphertext
+func ImportCiphertext(parameterHandle uint64, destHandle uint64, sourceMetadata *C.Metadata, targetMetadata *C.Metadata, cCiphertext *C.CCiphertext) (status C.ErrorStatus) {
+	status = okStatus()
+	defer recoverStatus(&status)
 
-	dest.switching_keys = (*C.CSwitchingKey)(C.malloc(C.size_t(n_switching_key) * C.size_t(unsafe.Sizeof(C.CSwitchingKey{}))))
-	switching_keys := unsafe.Slice(dest.switching_keys, n_switching_key)
-	for switching_key_idx := range galois_elements {
-		switching_key := src.Keys[uint64(galois_elements[switching_key_idx])]
-		export_switching_key(params, switching_key, &switching_keys[switching_key_idx], level, level_p, mf_nbits)
+	if targetMetadata == nil {
+		return errorStatus(fmt.Errorf("target metadata is required for ciphertext import"))
+	}
+	if targetMetadata.log_slots < 0 {
+		return errorStatus(fmt.Errorf("target metadata log_slots must be non-negative, got %d", int(targetMetadata.log_slots)))
+	}
+	if targetMetadata.scale <= 0 {
+		return errorStatus(fmt.Errorf("target metadata scale must be positive, got %f", float64(targetMetadata.scale)))
+	}
+
+	params := getObjectAs[rlwe.ParameterProvider](parameterHandle).GetRLWEParameters()
+	dest := getObject[rlwe.Ciphertext](destHandle)
+	cipherSize := int(cCiphertext.cipher_size)
+	level := int(cCiphertext.level)
+	ringDegree := int(cCiphertext.ring_degree)
+	rnsSize := level + 1
+
+	dest.Resize(cipherSize-1, level)
+	for polyIdx := 0; polyIdx < minInt(cipherSize, len(dest.Value)); polyIdx++ {
+		for rnsIdx := 0; rnsIdx < minInt(rnsSize, len(dest.Value[polyIdx].Coeffs)); rnsIdx++ {
+			offset := (polyIdx*rnsSize + rnsIdx) * ringDegree
+			copy(dest.Value[polyIdx].Coeffs[rnsIdx], uint64Slice(uint64PtrAt(cCiphertext.data, offset), ringDegree))
+		}
+	}
+
+	if sourceMetadata != nil {
+		ringQ := params.RingQ().AtLevel(level)
+		for polyIdx := 0; polyIdx < minInt(cipherSize, len(dest.Value)); polyIdx++ {
+			transformNTT(ringQ, dest.Value[polyIdx], sourceMetadata.is_ntt != 0, targetMetadata.is_ntt != 0)
+			transformMontgomeryBits(ringQ, dest.Value[polyIdx], int(sourceMetadata.mform_bits), int(targetMetadata.mform_bits))
+		}
+	}
+
+	dest.IsRingT = targetMetadata.is_ringt != 0
+	dest.IsBatched = targetMetadata.is_batched != 0
+	dest.IsNTT = targetMetadata.is_ntt != 0
+	dest.IsMontgomery = targetMetadata.mform_bits == 64
+	dest.LogDimensions.Rows = 0
+	dest.LogDimensions.Cols = int(targetMetadata.log_slots)
+	scale := float64(targetMetadata.scale)
+	dest.Scale = params.NewScale(scale)
+	return status
+}
+
+//export ExportPlaintext
+func ExportPlaintext(parameterHandle uint64, plaintextHandle uint64, metadata *C.Metadata, plaintext *C.CPlaintext) {
+	params := getObjectAs[rlwe.ParameterProvider](parameterHandle).GetRLWEParameters()
+	src := getObject[rlwe.Plaintext](plaintextHandle)
+	level := src.Level()
+	ringDegree := ringDegree(src.Value)
+	rnsSize := level + 1
+
+	plaintext.level = C.int(level)
+	plaintext.ring_degree = C.int(ringDegree)
+	plaintext.data = mallocUint64s(rnsSize * ringDegree)
+
+	for rnsIdx := 0; rnsIdx < rnsSize; rnsIdx++ {
+		copy(uint64Slice(uint64PtrAt(plaintext.data, rnsIdx*ringDegree), ringDegree), src.Value.Coeffs[rnsIdx])
+	}
+
+	if metadata == nil || src.IsRingT || metadata.is_ringt != 0 {
+		return
+	}
+
+	sourceMFormBits := 0
+	if src.IsMontgomery {
+		sourceMFormBits = 64
+	}
+	qPoly := polyViewFromFlatRNS(plaintext.data, rnsSize, ringDegree)
+	ringQ := params.RingQ().AtLevel(level)
+	transformNTT(ringQ, qPoly, src.IsNTT, metadata.is_ntt != 0)
+	transformMontgomeryBits(ringQ, qPoly, sourceMFormBits, int(metadata.mform_bits))
+}
+
+//export ExportCiphertext
+func ExportCiphertext(parameterHandle uint64, ciphertextHandle uint64, metadata *C.Metadata, ciphertext *C.CCiphertext) {
+	params := getObjectAs[rlwe.ParameterProvider](parameterHandle).GetRLWEParameters()
+	src := getObject[rlwe.Ciphertext](ciphertextHandle)
+	level := src.Level()
+	cipherSize := src.Degree() + 1
+
+	if cipherSize <= 0 || len(src.Value) == 0 {
+		ciphertext.level = C.int(level)
+		ciphertext.cipher_size = C.int(0)
+		ciphertext.ring_degree = C.int(0)
+		ciphertext.data = nil
+		return
+	}
+
+	ringDegree := ringDegree(src.Value[0])
+	rnsSize := level + 1
+
+	ciphertext.level = C.int(level)
+	ciphertext.cipher_size = C.int(cipherSize)
+	ciphertext.ring_degree = C.int(ringDegree)
+	ciphertext.data = mallocUint64s(cipherSize * rnsSize * ringDegree)
+
+	for polyIdx := 0; polyIdx < minInt(cipherSize, len(src.Value)); polyIdx++ {
+		for rnsIdx := 0; rnsIdx < minInt(rnsSize, len(src.Value[polyIdx].Coeffs)); rnsIdx++ {
+			offset := (polyIdx*rnsSize + rnsIdx) * ringDegree
+			copy(uint64Slice(uint64PtrAt(ciphertext.data, offset), ringDegree), src.Value[polyIdx].Coeffs[rnsIdx])
+		}
+	}
+
+	if metadata == nil {
+		return
+	}
+
+	sourceMFormBits := 0
+	if src.IsMontgomery {
+		sourceMFormBits = 64
+	}
+	ringQ := params.RingQ().AtLevel(level)
+	for polyIdx := 0; polyIdx < minInt(cipherSize, len(src.Value)); polyIdx++ {
+		qPoly := polyViewFromFlatRNS(uint64PtrAt(ciphertext.data, polyIdx*rnsSize*ringDegree), rnsSize, ringDegree)
+		transformNTT(ringQ, qPoly, src.IsNTT, metadata.is_ntt != 0)
+		transformMontgomeryBits(ringQ, qPoly, sourceMFormBits, int(metadata.mform_bits))
 	}
 }
 
-//export ImportBfvCiphertext
-func ImportBfvCiphertext(dest_handle uint64, c_ciphertext *C.CCiphertext) {
-	dest := get_object[bfv.Ciphertext](dest_handle)
-	import_ciphertext_polys(c_ciphertext, dest.Value)
-}
-
-//export ImportCkksCiphertext
-func ImportCkksCiphertext(dest_handle uint64, c_ciphertext *C.CCiphertext) {
-	dest := get_object[ckks.Ciphertext](dest_handle)
-	import_ciphertext_polys(c_ciphertext, dest.Value)
-}
-
-//export ExportBfvPlaintextRingt
-func ExportBfvPlaintextRingt(plaintext_ringt_handle uint64, c_plaintext *C.CPlaintext) {
-	plaintext_ringt := get_object[bfv.PlaintextRingT](plaintext_ringt_handle)
-	export_plaintext_poly(plaintext_ringt.Value, c_plaintext)
-}
-
-//export ExportCkksPlaintextRingt
-func ExportCkksPlaintextRingt(plaintext_ringt_handle uint64, c_plaintext *C.CPlaintext) {
-	plaintext_ringt := get_object[ckks.PlaintextRingT](plaintext_ringt_handle)
-	export_plaintext_poly(plaintext_ringt.Value, c_plaintext)
-}
-
-//export ExportBfvPlaintextMul
-func ExportBfvPlaintextMul(parameter_handle uint64, plaintext_mul_handle uint64, mf_nbits int, c_plaintext *C.CPlaintext) {
-	param := get_object[bfv.Parameters](parameter_handle)
-	plaintext_mul := get_object[bfv.PlaintextMul](plaintext_mul_handle)
-	export_plaintext_poly(plaintext_mul.Value, c_plaintext)
-	if mf_nbits != 64 {
-		c_poly := poly_view_from_flat_rns(c_plaintext.data, int(c_plaintext.level)+1, int(c_plaintext.ring_degree))
-		param.RingQ().InvMFormAndMulByPow2(c_poly, mf_nbits, c_poly)
+//export ExportEvaluationKey
+func ExportEvaluationKey(parameterHandle uint64, evaluationKeyHandle uint64, levelP int, metadata *C.Metadata, evaluationKey *C.CEvaluationKey) {
+	params := getObjectAs[rlwe.ParameterProvider](parameterHandle).GetRLWEParameters()
+	value := cgo.Handle(evaluationKeyHandle).Value()
+	switch key := value.(type) {
+	case *rlwe.EvaluationKey:
+		resolvedLevelP := levelP
+		if resolvedLevelP == -1 {
+			resolvedLevelP = key.LevelP()
+		}
+		exportEvaluationKey(params, key, evaluationKey, resolvedLevelP, metadata)
+	case *rlwe.RelinearizationKey:
+		resolvedLevelP := levelP
+		if resolvedLevelP == -1 {
+			resolvedLevelP = key.LevelP()
+		}
+		exportEvaluationKey(params, &key.EvaluationKey, evaluationKey, resolvedLevelP, metadata)
+	case *rlwe.GaloisKey:
+		resolvedLevelP := levelP
+		if resolvedLevelP == -1 {
+			resolvedLevelP = key.LevelP()
+		}
+		exportEvaluationKey(params, &key.EvaluationKey, evaluationKey, resolvedLevelP, metadata)
 	}
-}
-
-//export ExportCkksPlaintextMul
-func ExportCkksPlaintextMul(parameter_handle uint64, plaintext_mul_handle uint64, mf_nbits int, c_plaintext *C.CPlaintext) {
-	param := get_object[ckks.Parameters](parameter_handle)
-	plaintext_mul := get_object[ckks.PlaintextMul](plaintext_mul_handle)
-	export_plaintext_poly(plaintext_mul.Value, c_plaintext)
-	if mf_nbits != 64 {
-		c_poly := poly_view_from_flat_rns(c_plaintext.data, int(c_plaintext.level)+1, int(c_plaintext.ring_degree))
-		param.RingQ().InvMFormAndMulByPow2(c_poly, mf_nbits, c_poly)
-	}
-}
-
-//export ExportBfvPlaintext
-func ExportBfvPlaintext(plaintext_handle uint64, c_plaintext *C.CPlaintext) {
-	plaintext := get_object[bfv.Plaintext](plaintext_handle)
-	export_plaintext_poly(plaintext.Value, c_plaintext)
-}
-
-//export ExportCkksPlaintext
-func ExportCkksPlaintext(plaintext_handle uint64, c_plaintext *C.CPlaintext) {
-	plaintext := get_object[ckks.Plaintext](plaintext_handle)
-	export_plaintext_poly(plaintext.Value, c_plaintext)
-}
-
-//export ExportBfvCiphertext
-func ExportBfvCiphertext(ciphertext_handle uint64, c_ciphertext *C.CCiphertext) {
-	ciphertext := get_object[bfv.Ciphertext](ciphertext_handle)
-	export_ciphertext_polys(ciphertext.Value, ciphertext.Level(), ciphertext.Degree()+1, c_ciphertext)
-}
-
-//export ExportCkksCiphertext
-func ExportCkksCiphertext(ciphertext_handle uint64, c_ciphertext *C.CCiphertext) {
-	ciphertext := get_object[ckks.Ciphertext](ciphertext_handle)
-	export_ciphertext_polys(ciphertext.Value, ciphertext.Level(), ciphertext.Degree()+1, c_ciphertext)
-}
-
-//export ExportBfvRelinKey
-func ExportBfvRelinKey(parameter_handle uint64, relin_key_handle uint64, level int, key_mf_nbits int, c_relin_key *C.CRelinKey) {
-	param := get_object[bfv.Parameters](parameter_handle)
-	relin_key := get_object[rlwe.RelinearizationKey](relin_key_handle)
-	export_switching_key(param.Parameters, relin_key.Keys[0], c_relin_key, level, relin_key.Keys[0].LevelP(), key_mf_nbits)
-}
-
-//export ExportCkksRelinKey
-func ExportCkksRelinKey(parameter_handle uint64, relin_key_handle uint64, level int, key_mf_nbits int, c_relin_key *C.CRelinKey) {
-	param := get_object[ckks.Parameters](parameter_handle)
-	relin_key := get_object[rlwe.RelinearizationKey](relin_key_handle)
-	export_switching_key(param.Parameters, relin_key.Keys[0], c_relin_key, level, relin_key.Keys[0].LevelP(), key_mf_nbits)
-}
-
-//export ExportBfvGaloisKey
-func ExportBfvGaloisKey(parameter_handle uint64, galois_key_handle uint64, level int, key_mf_nbits int, c_galois_key *C.CGaloisKey) {
-	param := get_object[bfv.Parameters](parameter_handle)
-	galois_key := get_object[rlwe.RotationKeySet](galois_key_handle)
-	export_galois_key(param.Parameters, galois_key, c_galois_key, level, key_mf_nbits)
-}
-
-//export ExportCkksGaloisKey
-func ExportCkksGaloisKey(parameter_handle uint64, galois_key_handle uint64, level int, key_mf_nbits int, c_galois_key *C.CGaloisKey) {
-	param := get_object[ckks.Parameters](parameter_handle)
-	galois_key := get_object[rlwe.RotationKeySet](galois_key_handle)
-	export_galois_key(param.Parameters, galois_key, c_galois_key, level, key_mf_nbits)
-}
-
-//export ExportCkksSwitchingKey
-func ExportCkksSwitchingKey(parameter_handle uint64, switching_key_handle uint64, level_q int, level_p int, key_mf_nbits int, c_switch_key *C.CSwitchingKey) {
-	param := get_object[ckks.Parameters](parameter_handle)
-	switch_key := get_object[rlwe.SwitchingKey](switching_key_handle)
-	export_switching_key(param.Parameters, switch_key, c_switch_key, level_q, level_p, key_mf_nbits)
 }
