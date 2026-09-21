@@ -668,7 +668,7 @@ func BfvRotateColumns(evaluatorHandle uint64, op0CiphertextHandle uint64, steps 
 	rotatedInput := map[int]*rlwe.Ciphertext{0: op0Ciphertext}
 	targetSubSteps := make([][]int, length)
 	for i, step := range rotationSteps {
-		glkColPosIdx, glkColNegIdx := getGLKCol(step)
+		glkColPosIdx, glkColNegIdx := getGLKCol(step, evaluator.GetParameters().LogMaxSlots())
 		subSteps := make([]int, 0, len(glkColPosIdx)+len(glkColNegIdx))
 		for _, idx := range glkColPosIdx {
 			subSteps = append(subSteps, 1<<idx)

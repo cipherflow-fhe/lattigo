@@ -250,8 +250,8 @@ extern ErrorStatus BfvDropLevel(GoUint64 evaluatorHandle, GoUint64 op0Ciphertext
 extern ErrorStatus BfvRescale(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, uint64_t* opOutCiphertextHandle);
 extern ErrorStatus BfvRotateColumns(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, int32_t* steps, GoInt length, uint8_t useDefaultRotationKeys, uint64_t* opOutCiphertextHandles);
 extern ErrorStatus BfvRotateRows(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, uint64_t* opOutCiphertextHandle);
-extern ErrorStatus CreateCkksDefaultParameter(GoInt logN, uint64_t* parameterHandle);
-extern ErrorStatus CreateCkksCustomParameter(GoInt logN, GoInt logDefaultScale, uint64_t* q, GoInt qLen, uint64_t* p, GoInt pLen, uint64_t* parameterHandle);
+extern ErrorStatus CreateCkksDefaultParameter(GoInt logN, GoInt ringType, uint64_t* parameterHandle);
+extern ErrorStatus CreateCkksCustomParameter(GoInt logN, GoInt logDefaultScale, uint64_t* q, GoInt qLen, uint64_t* p, GoInt pLen, GoInt ringType, uint64_t* parameterHandle);
 extern ErrorStatus CopyCkksParameter(GoUint64 parameterHandle, uint64_t* targetHandle);
 extern ErrorStatus SerializeCkksParameter(GoUint64 parameterHandle, GoUint8** rawData, uint64_t* length, uint64_t* dataHandle);
 extern ErrorStatus DeserializeCkksParameter(GoUint8* rawData, uint64_t length, uint64_t* parameterHandle);
@@ -265,6 +265,7 @@ extern ErrorStatus GetCkksLogMaxSlots(GoUint64 parameterHandle, int* logMaxSlots
 extern ErrorStatus GetCkksMaxSlots(GoUint64 parameterHandle, int* maxSlots);
 extern ErrorStatus GetCkksDefaultScale(GoUint64 parameterHandle, double* defaultScale);
 extern ErrorStatus GetCkksLogDefaultScale(GoUint64 parameterHandle, int* logDefaultScale);
+extern ErrorStatus GetCkksRingType(GoUint64 parameterHandle, int* ringType);
 extern ErrorStatus CreateCkksEncoder(GoUint64 parameterHandle, uint64_t* encoderHandle);
 extern ErrorStatus CreateCkksEvaluator(GoUint64 parameterHandle, GoUint64 evaluationKeySetHandle, uint64_t* evaluatorHandle);
 extern ErrorStatus SetCkksEvaluatorEvaluationKeySet(GoUint64 evaluatorHandle, GoUint64 evaluationKeySetHandle);
@@ -290,14 +291,16 @@ extern GoUint64 CkksPolyEvalStepFunction(GoUint64 evaluatorHandle, GoUint64 ciph
 extern ErrorStatus GetCkksResidualParameterFromBtpParameter(GoUint64 parameterHandle, uint64_t* residualParameterHandle);
 extern ErrorStatus GetCkksBootstrappingParameterFromBtpParameter(GoUint64 parameterHandle, uint64_t* bootstrappingParameterHandle);
 extern ErrorStatus CreateCkksBtpParameterFromResidualParameter(GoUint64 residualParameterHandle, uint64_t* parameterHandle);
-extern ErrorStatus GenCkksBootstrappingEvaluationKeys(GoUint64 parameterHandle, GoUint64 secretKeyHandle, uint64_t* bootstrappingEvaluationKeysHandle, uint64_t* evkN1ToN2Handle, uint64_t* evkN2ToN1Handle, uint64_t* evkDenseToSparseHandle, uint64_t* evkSparseToDenseHandle, uint64_t* evaluationKeySetHandle);
-extern ErrorStatus CreateCkksBootstrappingEvaluationKeys(GoUint64 evkN1ToN2Handle, GoUint64 evkN2ToN1Handle, GoUint64 evkDenseToSparseHandle, GoUint64 evkSparseToDenseHandle, GoUint64 evaluationKeySetHandle, uint64_t* bootstrappingEvaluationKeysHandle);
-extern ErrorStatus GetCkksBootstrappingEvaluationKeys(GoUint64 bootstrappingEvaluationKeysHandle, uint64_t* evkN1ToN2Handle, uint64_t* evkN2ToN1Handle, uint64_t* evkDenseToSparseHandle, uint64_t* evkSparseToDenseHandle, uint64_t* evaluationKeySetHandle);
+extern ErrorStatus GenCkksBootstrappingEvaluationKeys(GoUint64 parameterHandle, GoUint64 secretKeyHandle, uint64_t* bootstrappingEvaluationKeysHandle, uint64_t* evkN1ToN2Handle, uint64_t* evkN2ToN1Handle, uint64_t* evkCmplxToRealHandle, uint64_t* evkRealToCmplxHandle, uint64_t* evkDenseToSparseHandle, uint64_t* evkSparseToDenseHandle, uint64_t* evaluationKeySetHandle);
+extern ErrorStatus CreateCkksBootstrappingEvaluationKeys(GoUint64 evkN1ToN2Handle, GoUint64 evkN2ToN1Handle, GoUint64 evkCmplxToRealHandle, GoUint64 evkRealToCmplxHandle, GoUint64 evkDenseToSparseHandle, GoUint64 evkSparseToDenseHandle, GoUint64 evaluationKeySetHandle, uint64_t* bootstrappingEvaluationKeysHandle);
+extern ErrorStatus GetCkksBootstrappingEvaluationKeys(GoUint64 bootstrappingEvaluationKeysHandle, uint64_t* evkN1ToN2Handle, uint64_t* evkN2ToN1Handle, uint64_t* evkCmplxToRealHandle, uint64_t* evkRealToCmplxHandle, uint64_t* evkDenseToSparseHandle, uint64_t* evkSparseToDenseHandle, uint64_t* evaluationKeySetHandle);
 extern ErrorStatus SerializeCkksBootstrappingEvaluationKeys(GoUint64 bootstrappingEvaluationKeysHandle, GoUint8** rawData, uint64_t* length, uint64_t* dataHandle);
 extern ErrorStatus DeserializeCkksBootstrappingEvaluationKeys(GoUint8* rawData, uint64_t length, uint64_t* bootstrappingEvaluationKeysHandle);
 extern ErrorStatus SetCkksBootstrappingEvaluationKeySet(GoUint64 bootstrappingEvaluationKeysHandle, GoUint64 evaluationKeySetHandle);
 extern ErrorStatus SetCkksBootstrappingEvaluationKeyN1ToN2(GoUint64 bootstrappingEvaluationKeysHandle, GoUint64 evaluationKeyHandle);
 extern ErrorStatus SetCkksBootstrappingEvaluationKeyN2ToN1(GoUint64 bootstrappingEvaluationKeysHandle, GoUint64 evaluationKeyHandle);
+extern ErrorStatus SetCkksBootstrappingEvaluationKeyCmplxToReal(GoUint64 bootstrappingEvaluationKeysHandle, GoUint64 evaluationKeyHandle);
+extern ErrorStatus SetCkksBootstrappingEvaluationKeyRealToCmplx(GoUint64 bootstrappingEvaluationKeysHandle, GoUint64 evaluationKeyHandle);
 extern ErrorStatus SetCkksBootstrappingEvaluationKeyDenseToSparse(GoUint64 bootstrappingEvaluationKeysHandle, GoUint64 evaluationKeyHandle);
 extern ErrorStatus SetCkksBootstrappingEvaluationKeySparseToDense(GoUint64 bootstrappingEvaluationKeysHandle, GoUint64 evaluationKeyHandle);
 extern ErrorStatus CreateCkksBtpEvaluator(GoUint64 parameterHandle, GoUint64 bootstrappingEvaluationKeysHandle, uint64_t* evaluatorHandle);

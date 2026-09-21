@@ -23,15 +23,35 @@ import (
 	"github.com/cipherflow-fhe/lattigo/circuits/ckks/bootstrapping"
 	"github.com/cipherflow-fhe/lattigo/core/rlwe"
 	"github.com/cipherflow-fhe/lattigo/examples"
+	"github.com/cipherflow-fhe/lattigo/ring"
 	"github.com/cipherflow-fhe/lattigo/schemes/ckks"
 )
 
 // ─── CkksParameter ───────────────────────────────────────────────────────────
 
+// ringTypeFromInt maps the integer ring type used across the C ABI / JSON layer
+// to the corresponding [ring.Type]. It mirrors the values of ring.Standard (0)
+// and ring.ConjugateInvariant (1).
+func ringTypeFromInt(v int) (ring.Type, error) {
+	switch v {
+	case 0:
+		return ring.Standard, nil
+	case 1:
+		return ring.ConjugateInvariant, nil
+	default:
+		return ring.Standard, fmt.Errorf("unsupported ring type %d", v)
+	}
+}
+
 //export CreateCkksDefaultParameter
-func CreateCkksDefaultParameter(logN int, parameterHandle *C.uint64_t) (status C.ErrorStatus) {
+func CreateCkksDefaultParameter(logN int, ringType int, parameterHandle *C.uint64_t) (status C.ErrorStatus) {
 	status = okStatus()
 	defer recoverStatus(&status)
+
+	ringTypeValue, err := ringTypeFromInt(ringType)
+	if err != nil {
+		return errorStatus(err)
+	}
 
 	var literal ckks.ParametersLiteral
 	switch logN {
@@ -48,7 +68,11 @@ func CreateCkksDefaultParameter(logN int, parameterHandle *C.uint64_t) (status C
 	default:
 		return errorStatus(fmt.Errorf("LogN not supported"))
 	}
-	literal.LogNthRoot = bootstrapping.DefaultLogN + 1
+	// Keep the generated moduli consistent with frontend/parameter.json, which is materialized with
+	// LogNthRoot = max(LogN+2, bootstrapping.DefaultLogN+1). This is also 4N-compatible, so the same
+	// moduli chain serves both the standard and the conjugate-invariant ring.
+	literal.LogNthRoot = max(logN+2, bootstrapping.DefaultLogN+1)
+	literal.RingType = ringTypeValue
 
 	params, err := ckks.NewParametersFromLiteral(literal)
 	if err != nil {
@@ -59,9 +83,14 @@ func CreateCkksDefaultParameter(logN int, parameterHandle *C.uint64_t) (status C
 }
 
 //export CreateCkksCustomParameter
-func CreateCkksCustomParameter(logN int, logDefaultScale int, q *C.uint64_t, qLen int, p *C.uint64_t, pLen int, parameterHandle *C.uint64_t) (status C.ErrorStatus) {
+func CreateCkksCustomParameter(logN int, logDefaultScale int, q *C.uint64_t, qLen int, p *C.uint64_t, pLen int, ringType int, parameterHandle *C.uint64_t) (status C.ErrorStatus) {
 	status = okStatus()
 	defer recoverStatus(&status)
+
+	ringTypeValue, err := ringTypeFromInt(ringType)
+	if err != nil {
+		return errorStatus(err)
+	}
 
 	qSlice := unsafe.Slice((*uint64)(q), qLen)
 	pSlice := unsafe.Slice((*uint64)(p), pLen)
@@ -71,6 +100,7 @@ func CreateCkksCustomParameter(logN int, logDefaultScale int, q *C.uint64_t, qLe
 		Q:               append([]uint64(nil), qSlice...),
 		P:               append([]uint64(nil), pSlice...),
 		LogDefaultScale: logDefaultScale,
+		RingType:        ringTypeValue,
 	}
 
 	params, err := ckks.NewParametersFromLiteral(literal)
@@ -247,6 +277,16 @@ func GetCkksLogDefaultScale(parameterHandle uint64, logDefaultScale *C.int) (sta
 
 	params := getObject[ckks.Parameters](parameterHandle)
 	*logDefaultScale = C.int(params.LogDefaultScale())
+	return status
+}
+
+//export GetCkksRingType
+func GetCkksRingType(parameterHandle uint64, ringType *C.int) (status C.ErrorStatus) {
+	status = okStatus()
+	defer recoverStatus(&status)
+
+	params := getObject[ckks.Parameters](parameterHandle)
+	*ringType = C.int(params.RingType())
 	return status
 }
 
@@ -607,7 +647,7 @@ func CkksRescale(evaluatorHandle uint64, op0CiphertextHandle uint64, opOutCipher
 	return status
 }
 
-func getGLKCol(step int32) (glkColPosIdx []int, glkColNegIdx []int) {
+func getGLKCol(step int32, logSlots int) (glkColPosIdx []int, glkColNegIdx []int) {
 	convertToNAF := func(x int32) (string, string) {
 		xh := x >> 1
 		x3 := x + xh
@@ -622,13 +662,23 @@ func getGLKCol(step int32) (glkColPosIdx []int, glkColNegIdx []int) {
 		if digit == '0' {
 			continue
 		}
-		glkColPosIdx = append(glkColPosIdx, len(rPos)-idx-1)
+		bit := len(rPos) - idx - 1
+		// A substep that is a multiple of the slot count is the identity rotation (e.g. N/2 for the
+		// standard ring or N for the conjugate-invariant ring) and needs no Galois key.
+		if bit >= logSlots {
+			continue
+		}
+		glkColPosIdx = append(glkColPosIdx, bit)
 	}
 	for idx, digit := range rNeg {
 		if digit == '0' {
 			continue
 		}
-		glkColNegIdx = append(glkColNegIdx, len(rNeg)-idx-1)
+		bit := len(rNeg) - idx - 1
+		if bit >= logSlots {
+			continue
+		}
+		glkColNegIdx = append(glkColNegIdx, bit)
 	}
 	return
 }
@@ -670,7 +720,7 @@ func CkksRotate(evaluatorHandle uint64, op0CiphertextHandle uint64, steps *C.int
 
 	rotatedInput := map[int]*rlwe.Ciphertext{0: op0Ciphertext}
 	for i, step := range rotationSteps {
-		glkColPosIdx, glkColNegIdx := getGLKCol(step)
+		glkColPosIdx, glkColNegIdx := getGLKCol(step, evaluator.GetParameters().LogMaxSlots())
 		subSteps := make([]int, 0, len(glkColPosIdx)+len(glkColNegIdx))
 		for _, idx := range glkColPosIdx {
 			subSteps = append(subSteps, 1<<idx)

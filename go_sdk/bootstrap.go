@@ -20,6 +20,7 @@ import (
 
 	"github.com/cipherflow-fhe/lattigo/circuits/ckks/bootstrapping"
 	"github.com/cipherflow-fhe/lattigo/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/ring"
 	"github.com/cipherflow-fhe/lattigo/schemes/ckks"
 )
 
@@ -54,6 +55,11 @@ func CreateCkksBtpParameterFromResidualParameter(residualParameterHandle uint64,
 
 	params := getObject[ckks.Parameters](residualParameterHandle)
 	btpParametersLit := bootstrapping.ParametersLiteral{}
+	
+	if params.RingType() == ring.ConjugateInvariant {
+		btpLogN := params.LogN() + 1
+		btpParametersLit.LogN = &btpLogN
+	}
 	btpParams, err := bootstrapping.NewParametersFromLiteral(*params, btpParametersLit)
 	if err != nil {
 		return errorStatus(err)
@@ -64,12 +70,13 @@ func CreateCkksBtpParameterFromResidualParameter(residualParameterHandle uint64,
 		btpParams.CoeffsToSlotsParameters.LogSlots = btpLogN - 1
 		btpParams.Mod1ParametersLiteral.LogMessageRatio += btpLogN - params.LogN()
 	}
+
 	*parameterHandle = C.uint64_t(insertObject(&btpParams))
 	return status
 }
 
 //export GenCkksBootstrappingEvaluationKeys
-func GenCkksBootstrappingEvaluationKeys(parameterHandle uint64, secretKeyHandle uint64, bootstrappingEvaluationKeysHandle *C.uint64_t, evkN1ToN2Handle *C.uint64_t, evkN2ToN1Handle *C.uint64_t, evkDenseToSparseHandle *C.uint64_t, evkSparseToDenseHandle *C.uint64_t, evaluationKeySetHandle *C.uint64_t) (status C.ErrorStatus) {
+func GenCkksBootstrappingEvaluationKeys(parameterHandle uint64, secretKeyHandle uint64, bootstrappingEvaluationKeysHandle *C.uint64_t, evkN1ToN2Handle *C.uint64_t, evkN2ToN1Handle *C.uint64_t, evkCmplxToRealHandle *C.uint64_t, evkRealToCmplxHandle *C.uint64_t, evkDenseToSparseHandle *C.uint64_t, evkSparseToDenseHandle *C.uint64_t, evaluationKeySetHandle *C.uint64_t) (status C.ErrorStatus) {
 	status = okStatus()
 	defer recoverStatus(&status)
 
@@ -86,6 +93,13 @@ func GenCkksBootstrappingEvaluationKeys(parameterHandle uint64, secretKeyHandle 
 	if keys.EvkN2ToN1 != nil {
 		*evkN2ToN1Handle = C.uint64_t(insertObject(keys.EvkN2ToN1))
 	}
+	
+	if keys.EvkCmplxToReal != nil {
+		*evkCmplxToRealHandle = C.uint64_t(insertObject(keys.EvkCmplxToReal))
+	}
+	if keys.EvkRealToCmplx != nil {
+		*evkRealToCmplxHandle = C.uint64_t(insertObject(keys.EvkRealToCmplx))
+	}
 	if keys.EvkDenseToSparse != nil {
 		*evkDenseToSparseHandle = C.uint64_t(insertObject(keys.EvkDenseToSparse))
 	}
@@ -100,7 +114,7 @@ func GenCkksBootstrappingEvaluationKeys(parameterHandle uint64, secretKeyHandle 
 }
 
 //export CreateCkksBootstrappingEvaluationKeys
-func CreateCkksBootstrappingEvaluationKeys(evkN1ToN2Handle uint64, evkN2ToN1Handle uint64, evkDenseToSparseHandle uint64, evkSparseToDenseHandle uint64, evaluationKeySetHandle uint64, bootstrappingEvaluationKeysHandle *C.uint64_t) (status C.ErrorStatus) {
+func CreateCkksBootstrappingEvaluationKeys(evkN1ToN2Handle uint64, evkN2ToN1Handle uint64, evkCmplxToRealHandle uint64, evkRealToCmplxHandle uint64, evkDenseToSparseHandle uint64, evkSparseToDenseHandle uint64, evaluationKeySetHandle uint64, bootstrappingEvaluationKeysHandle *C.uint64_t) (status C.ErrorStatus) {
 	status = okStatus()
 	defer recoverStatus(&status)
 
@@ -110,6 +124,12 @@ func CreateCkksBootstrappingEvaluationKeys(evkN1ToN2Handle uint64, evkN2ToN1Hand
 	}
 	if evkN2ToN1Handle != 0 {
 		keys.EvkN2ToN1 = getObject[rlwe.EvaluationKey](evkN2ToN1Handle)
+	}
+	if evkCmplxToRealHandle != 0 {
+		keys.EvkCmplxToReal = getObject[rlwe.EvaluationKey](evkCmplxToRealHandle)
+	}
+	if evkRealToCmplxHandle != 0 {
+		keys.EvkRealToCmplx = getObject[rlwe.EvaluationKey](evkRealToCmplxHandle)
 	}
 	if evkDenseToSparseHandle != 0 {
 		keys.EvkDenseToSparse = getObject[rlwe.EvaluationKey](evkDenseToSparseHandle)
@@ -125,13 +145,15 @@ func CreateCkksBootstrappingEvaluationKeys(evkN1ToN2Handle uint64, evkN2ToN1Hand
 }
 
 //export GetCkksBootstrappingEvaluationKeys
-func GetCkksBootstrappingEvaluationKeys(bootstrappingEvaluationKeysHandle uint64, evkN1ToN2Handle *C.uint64_t, evkN2ToN1Handle *C.uint64_t, evkDenseToSparseHandle *C.uint64_t, evkSparseToDenseHandle *C.uint64_t, evaluationKeySetHandle *C.uint64_t) (status C.ErrorStatus) {
+func GetCkksBootstrappingEvaluationKeys(bootstrappingEvaluationKeysHandle uint64, evkN1ToN2Handle *C.uint64_t, evkN2ToN1Handle *C.uint64_t, evkCmplxToRealHandle *C.uint64_t, evkRealToCmplxHandle *C.uint64_t, evkDenseToSparseHandle *C.uint64_t, evkSparseToDenseHandle *C.uint64_t, evaluationKeySetHandle *C.uint64_t) (status C.ErrorStatus) {
 	status = okStatus()
 	defer recoverStatus(&status)
 
 	keys := getObject[bootstrapping.EvaluationKeys](bootstrappingEvaluationKeysHandle)
 	*evkN1ToN2Handle = 0
 	*evkN2ToN1Handle = 0
+	*evkCmplxToRealHandle = 0
+	*evkRealToCmplxHandle = 0
 	*evkDenseToSparseHandle = 0
 	*evkSparseToDenseHandle = 0
 	*evaluationKeySetHandle = 0
@@ -140,6 +162,13 @@ func GetCkksBootstrappingEvaluationKeys(bootstrappingEvaluationKeysHandle uint64
 	}
 	if keys.EvkN2ToN1 != nil {
 		*evkN2ToN1Handle = C.uint64_t(insertObject(keys.EvkN2ToN1))
+	}
+	
+	if keys.EvkCmplxToReal != nil {
+		*evkCmplxToRealHandle = C.uint64_t(insertObject(keys.EvkCmplxToReal))
+	}
+	if keys.EvkRealToCmplx != nil {
+		*evkRealToCmplxHandle = C.uint64_t(insertObject(keys.EvkRealToCmplx))
 	}
 	if keys.EvkDenseToSparse != nil {
 		*evkDenseToSparseHandle = C.uint64_t(insertObject(keys.EvkDenseToSparse))
@@ -227,6 +256,28 @@ func SetCkksBootstrappingEvaluationKeyN2ToN1(bootstrappingEvaluationKeysHandle u
 	keys := getObject[bootstrapping.EvaluationKeys](bootstrappingEvaluationKeysHandle)
 	evaluationKey := getObject[rlwe.EvaluationKey](evaluationKeyHandle)
 	keys.EvkN2ToN1 = evaluationKey
+	return status
+}
+
+//export SetCkksBootstrappingEvaluationKeyCmplxToReal
+func SetCkksBootstrappingEvaluationKeyCmplxToReal(bootstrappingEvaluationKeysHandle uint64, evaluationKeyHandle uint64) (status C.ErrorStatus) {
+	status = okStatus()
+	defer recoverStatus(&status)
+
+	keys := getObject[bootstrapping.EvaluationKeys](bootstrappingEvaluationKeysHandle)
+	evaluationKey := getObject[rlwe.EvaluationKey](evaluationKeyHandle)
+	keys.EvkCmplxToReal = evaluationKey
+	return status
+}
+
+//export SetCkksBootstrappingEvaluationKeyRealToCmplx
+func SetCkksBootstrappingEvaluationKeyRealToCmplx(bootstrappingEvaluationKeysHandle uint64, evaluationKeyHandle uint64) (status C.ErrorStatus) {
+	status = okStatus()
+	defer recoverStatus(&status)
+
+	keys := getObject[bootstrapping.EvaluationKeys](bootstrappingEvaluationKeysHandle)
+	evaluationKey := getObject[rlwe.EvaluationKey](evaluationKeyHandle)
+	keys.EvkRealToCmplx = evaluationKey
 	return status
 }
 
