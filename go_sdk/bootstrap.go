@@ -22,6 +22,7 @@ import (
 	"github.com/cipherflow-fhe/lattigo/core/rlwe"
 	"github.com/cipherflow-fhe/lattigo/ring"
 	"github.com/cipherflow-fhe/lattigo/schemes/ckks"
+	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 //export GetCkksResidualParameterFromBtpParameter
@@ -48,28 +49,61 @@ func GetCkksBootstrappingParameterFromBtpParameter(parameterHandle uint64, boots
 	return status
 }
 
+// btpParamsByResidualLogN is the bootstrapping circuit shape, indexed by the
+// residual ring degree. The circuit always runs in the standard ring of degree
+// 16, which for a residual of log_n 16 is the residual ring itself and otherwise
+// is one or two degrees above it. Only a residual degree listed here can be
+// bootstrapped.
+var btpParamsByResidualLogN = map[int]bootstrapping.ParametersLiteral{
+	14: {
+		LogN: utils.Pointy(16),
+		SlotsToCoeffsFactorizationDepthAndLogScales: [][]int{{39}, {39}, {39}},
+		CoeffsToSlotsFactorizationDepthAndLogScales: [][]int{{56}, {56}, {56}, {56}},
+		EvalModLogScale:                              utils.Pointy(60),
+	},
+	15: {
+		LogN: utils.Pointy(16),
+		SlotsToCoeffsFactorizationDepthAndLogScales: [][]int{{39}, {39}, {39}},
+		CoeffsToSlotsFactorizationDepthAndLogScales: [][]int{{56}, {56}, {56}, {56}},
+		EvalModLogScale:                              utils.Pointy(60),
+	},
+	16: {
+		LogN: utils.Pointy(16),
+		SlotsToCoeffsFactorizationDepthAndLogScales: [][]int{{39}, {39}, {39}},
+		CoeffsToSlotsFactorizationDepthAndLogScales: [][]int{{56}, {56}, {56}, {56}},
+		EvalModLogScale:                              utils.Pointy(60),
+	},
+}
+
 //export CreateCkksBtpParameterFromResidualParameter
 func CreateCkksBtpParameterFromResidualParameter(residualParameterHandle uint64, parameterHandle *C.uint64_t) (status C.ErrorStatus) {
 	status = okStatus()
 	defer recoverStatus(&status)
 
 	params := getObject[ckks.Parameters](residualParameterHandle)
-	btpParametersLit := bootstrapping.ParametersLiteral{}
-	
-	if params.RingType() == ring.ConjugateInvariant {
-		btpLogN := params.LogN() + 1
-		btpParametersLit.LogN = &btpLogN
+
+	btpParametersLit, ok := btpParamsByResidualLogN[params.LogN()]
+	if !ok {
+		return errorStatus(fmt.Errorf("cannot CreateCkksBtpParameterFromResidualParameter: no bootstrapping parameter set for a residual of LogN=%d", params.LogN()))
 	}
+	bootLogN := btpParametersLit.GetLogN()
+
+	if params.RingType() == ring.ConjugateInvariant && bootLogN != params.LogN()+1 {
+		// The conjugate invariant ring is only compatible with a circuit degree of
+		// exactly residual LogN + 1, so that both rings share the same primitive
+		// root order m = 4 * n_ci.
+		return errorStatus(fmt.Errorf("cannot CreateCkksBtpParameterFromResidualParameter: bootstrapping LogN must be residual LogN + 1 for the conjugate invariant ring, got %d", bootLogN))
+	}
+
 	btpParams, err := bootstrapping.NewParametersFromLiteral(*params, btpParametersLit)
 	if err != nil {
 		return errorStatus(err)
 	}
-	btpLogN := btpParams.BootstrappingParameters.LogN()
-	if params.LogN() < btpLogN {
-		btpParams.SlotsToCoeffsParameters.LogSlots = btpLogN - 1
-		btpParams.CoeffsToSlotsParameters.LogSlots = btpLogN - 1
-		btpParams.Mod1ParametersLiteral.LogMessageRatio += btpLogN - params.LogN()
-	}
+	btpParams.SlotsToCoeffsParameters.LogSlots = bootLogN - 1
+	btpParams.CoeffsToSlotsParameters.LogSlots = bootLogN - 1
+	// The circuit ring is larger than the residual ring, which shifts the message
+	// ratio of the modular reduction by the degree difference.
+	btpParams.Mod1ParametersLiteral.LogMessageRatio += bootLogN - params.LogN()
 
 	*parameterHandle = C.uint64_t(insertObject(&btpParams))
 	return status

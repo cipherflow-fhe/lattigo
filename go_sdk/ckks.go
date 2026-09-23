@@ -43,6 +43,14 @@ func ringTypeFromInt(v int) (ring.Type, error) {
 	}
 }
 
+// ckksResidualPrimeCount is the number of ciphertext primes kept by the residual
+// parameter sets whose modulus leaves room for the bootstrapping circuit. A set
+// not listed here keeps all of its primes.
+var ckksResidualPrimeCount = map[int]int{
+	15: 13,
+	16: 12,
+}
+
 //export CreateCkksDefaultParameter
 func CreateCkksDefaultParameter(logN int, ringType int, parameterHandle *C.uint64_t) (status C.ErrorStatus) {
 	status = okStatus()
@@ -68,11 +76,21 @@ func CreateCkksDefaultParameter(logN int, ringType int, parameterHandle *C.uint6
 	default:
 		return errorStatus(fmt.Errorf("LogN not supported"))
 	}
-	// Keep the generated moduli consistent with frontend/parameter.json, which is materialized with
-	// LogNthRoot = max(LogN+2, bootstrapping.DefaultLogN+1). This is also 4N-compatible, so the same
-	// moduli chain serves both the standard and the conjugate-invariant ring.
+	// The moduli must be 1 modulo 2N of every ring they are used with, and 4N for
+	// the conjugate invariant ring, so that the same chain serves both and can be
+	// reused by the bootstrapping circuit. Keep the generated values consistent
+	// with frontend/parameter.json, which is materialized the same way.
 	literal.LogNthRoot = max(logN+2, bootstrapping.DefaultLogN+1)
 	literal.RingType = ringTypeValue
+
+	// Some residual sets keep only part of their ciphertext primes, leaving room in
+	// the modulus budget of the ring the bootstrapping circuit runs in.
+	if n, ok := ckksResidualPrimeCount[logN]; ok {
+		if n > len(literal.LogQ) {
+			return errorStatus(fmt.Errorf("LogN=%d has only %d ciphertext primes", logN, len(literal.LogQ)))
+		}
+		literal.LogQ = literal.LogQ[:n]
+	}
 
 	params, err := ckks.NewParametersFromLiteral(literal)
 	if err != nil {
