@@ -297,3 +297,24 @@ func TestStreamingBtpProtocolAndBootstrap(t *testing.T) {
 		})
 	}
 }
+
+func TestStreamingBtpRestoredClientShallowCopy(t *testing.T) {
+	// Deserializing a streaming full context creates an empty evk, with no bootstrapper.
+	context := &CkksBtpContext{
+		CkksContext: *testStreamingContext(t),
+		evk:         new(bootstrapping.EvaluationKeys),
+	}
+	handle := insert_object(context)
+	defer delete_object(handle)
+	copyHandle := ShallowCopyCkksBtpContext(handle)
+	defer delete_object(copyHandle)
+	copy := get_object[CkksBtpContext](copyHandle)
+	require.Nil(t, copy.bootstrapper)
+	params := *context.parameter
+	values := make([]complex128, params.Slots())
+	values[0] = 0.125
+	pt := copy.encoder.EncodeNew(values, 0, params.DefaultScale(), params.LogSlots())
+	ct := copy.encryptor_sk.EncryptNew(pt)
+	decoded := context.encoder.Decode(context.decryptor.DecryptNew(ct), params.LogSlots())
+	require.Less(t, cmplx.Abs(decoded[0]-values[0]), 0.001)
+}

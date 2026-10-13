@@ -314,7 +314,7 @@ func ShallowCopyCkksBtpContext(context_handle uint64) uint64 {
 		context_dest.encryptor_sk = nil
 		context_dest.decryptor = nil
 	}
-	if context_src.evk != nil {
+	if context_src.bootstrapper != nil {
 		context_dest.bootstrapper = context_src.bootstrapper.ShallowCopy()
 	} else {
 		context_dest.bootstrapper = nil
