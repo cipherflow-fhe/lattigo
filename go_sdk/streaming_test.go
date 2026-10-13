@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"math/cmplx"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/cipherflow-fhe/lattigo/ckks"
+	"github.com/cipherflow-fhe/lattigo/ckks/bootstrapping"
 	"github.com/cipherflow-fhe/lattigo/rlwe"
 	"github.com/stretchr/testify/require"
 )
@@ -45,7 +47,7 @@ func readStreamingCkks(t *testing.T, data []byte) (*ckks.Parameters, RlweContext
 	return params, context
 }
 
-func compareEvaluationKeys(t *testing.T, context *CkksContext, imported rlwe.EvaluationKey, extra []int) {
+func compareEvaluationKeys(t *testing.T, context *CkksContext, imported rlwe.EvaluationKey, extra []int) rlwe.EvaluationKey {
 	params := *context.parameter
 	rotations := make([]int, 0)
 	for i := 0; i < params.LogN()-1; i++ {
@@ -84,6 +86,7 @@ func compareEvaluationKeys(t *testing.T, context *CkksContext, imported rlwe.Eva
 			require.Less(t, cmplx.Abs(oldValues[i]-newValues[i]), 0.001)
 		}
 	}
+	return legacy
 }
 
 func TestStreamingCkksProtocolAndFunction(t *testing.T) {
@@ -202,4 +205,95 @@ func TestStreamingValidationAndCgoBoundary(t *testing.T) {
 	require.NotZero(t, StreamSetupCkksContextToFile(0, nil, false, nil))
 	require.Contains(t, error_message, "output context handle")
 	require.NotZero(t, StreamExportCkksEvalContextToFile(0, nil))
+}
+
+func TestStreamingBtpProtocolAndBootstrap(t *testing.T) {
+	for _, weight := range []int{32, 0} {
+		t.Run(fmt.Sprintf("ephemeral-%d", weight), func(t *testing.T) {
+			literal := bootstrapping.N16QP1546H192H32
+			literal.SchemeParams.LogN, literal.SchemeParams.LogSlots = 13, 12
+			if weight == 0 {
+				literal.SchemeParams.H = 32
+			}
+			params, err := ckks.NewParametersFromLiteral(literal.SchemeParams)
+			require.NoError(t, err)
+			btpParams := literal.BootstrappingParams
+			btpParams.EphemeralSecretWeight = weight
+			context := &CkksBtpContext{CkksContext: *newStreamingCkksContext(&params, false), btp_parameter: &btpParams}
+			destination := filepath.Join(t.TempDir(), "eval.bin")
+			require.NoError(t, streamCkksBtpEvalContext(context, destination))
+			require.Nil(t, context.evk)
+			require.Nil(t, context.rlk)
+			require.Nil(t, context.gk)
+			require.Nil(t, context.bootstrapper)
+			data, err := os.ReadFile(destination)
+			require.NoError(t, err)
+			reader := bytes.NewReader(append(append([]byte(nil), data...), 0xa5))
+			var size uint32
+			require.NoError(t, binary.Read(reader, binary.LittleEndian, &size))
+			reader.Seek(int64(size), io.SeekCurrent)
+			skFlag, _ := reader.ReadByte()
+			require.Zero(t, skFlag)
+			pkFlag, _ := reader.ReadByte()
+			require.Equal(t, byte(1), pkFlag)
+			rlwe.BytesToCiphertextQP(reader)
+			btpSize, _ := reader.ReadByte()
+			btpData := make([]byte, btpSize)
+			_, err = io.ReadFull(reader, btpData)
+			require.NoError(t, err)
+			decodedParams := new(bootstrapping.Parameters)
+			require.NoError(t, decodedParams.UnmarshalBinary(btpData))
+			expectedParams, err := btpParams.MarshalBinary()
+			require.NoError(t, err)
+			require.Equal(t, expectedParams, btpData)
+			flag, _ := reader.ReadByte()
+			require.Equal(t, byte(1), flag)
+			rlwe.BytesToRelinearizationKey(reader)
+			flag, _ = reader.ReadByte()
+			require.Equal(t, byte(1), flag)
+			keys := rlwe.BytesToRotationKeySet(reader)
+			require.Len(t, keys.Keys, len(evalGaloisElements(&params, btpParams.RotationsForBootstrapping(params))))
+			for _, sparseKey := range []bool{true, false} {
+				flag, _ = reader.ReadByte()
+				if weight == 0 {
+					require.Zero(t, flag)
+				} else {
+					require.Equal(t, byte(1), flag)
+					key := rlwe.BytesToGadgetCiphertext(reader)
+					expectedLevel := params.MaxLevel()
+					if sparseKey {
+						expectedLevel = 0
+					}
+					require.Equal(t, expectedLevel, key.Value[0][0].LevelQ())
+					require.Equal(t, params.PCount()-1, key.Value[0][0].LevelP())
+				}
+			}
+			require.Equal(t, 1, reader.Len())
+			sentinel, _ := reader.ReadByte()
+			require.Equal(t, byte(0xa5), sentinel)
+			handle := DeserializeCkksBtpContextAdvanced(&data[0], uint64(len(data)))
+			defer delete_object(handle)
+			imported := get_object[CkksBtpContext](handle)
+			require.Nil(t, imported.sk)
+			require.NotNil(t, imported.bootstrapper)
+			legacyKeys := compareEvaluationKeys(t, &context.CkksContext, imported.evk.EvaluationKey, btpParams.RotationsForBootstrapping(params))
+			dts, std := btpParams.GenEncapsulationSwitchingKeys(params, context.sk)
+			legacyBootstrapper, err := bootstrapping.NewBootstrapper(params, btpParams, bootstrapping.EvaluationKeys{
+				EvaluationKey: legacyKeys, SwkDtS: dts, SwkStD: std,
+			})
+			require.NoError(t, err)
+			values := make([]complex128, params.Slots())
+			for i := range values {
+				values[i] = complex(float64(i%13)/100, 0)
+			}
+			pt := context.encoder.EncodeNew(values, 0, params.DefaultScale(), params.LogSlots())
+			ct := context.encryptor_sk.EncryptNew(pt)
+			actual := context.encoder.Decode(context.decryptor.DecryptNew(imported.bootstrapper.Bootstrapp(ct.CopyNew())), params.LogSlots())
+			legacy := context.encoder.Decode(context.decryptor.DecryptNew(legacyBootstrapper.Bootstrapp(ct.CopyNew())), params.LogSlots())
+			for i := range values {
+				require.Less(t, cmplx.Abs(actual[i]-values[i]), 0.001)
+				require.Less(t, cmplx.Abs(actual[i]-legacy[i]), 0.001)
+			}
+		})
+	}
 }

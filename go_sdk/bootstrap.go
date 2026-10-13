@@ -7,6 +7,8 @@ import "C"
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
+	"io"
 	"unsafe"
 
 	"github.com/cipherflow-fhe/lattigo/ckks"
@@ -25,6 +27,99 @@ type CkksBtpContext struct {
 	btp_parameter *bootstrapping.Parameters
 	evk           *bootstrapping.EvaluationKeys
 	bootstrapper  *bootstrapping.Bootstrapper
+}
+
+func streamCkksBtpEvalContext(context *CkksBtpContext, destination string) error {
+	if err := validateEvalContext(&context.CkksContext); err != nil {
+		return err
+	}
+	if context.pk == nil || context.btp_parameter == nil {
+		return errors.New("BTP streaming requires a public key and bootstrapping parameters")
+	}
+	elements := evalGaloisElements(context.parameter, context.btp_parameter.RotationsForBootstrapping(*context.parameter))
+	parameters, err := context.parameter.MarshalBinary()
+	if err != nil {
+		return err
+	}
+	if err = validateEvalContextLengths(parameters, elements); err != nil {
+		return err
+	}
+	btpParameters, err := context.btp_parameter.MarshalBinary()
+	if err != nil {
+		return err
+	}
+	if len(btpParameters) > 255 {
+		return errors.New("BTP parameter length exceeds uint8 format")
+	}
+	sparse, err := rlwe.NewParametersFromLiteral(rlwe.ParametersLiteral{
+		LogN: context.parameter.LogN(), Q: context.parameter.Q()[:1], P: context.parameter.P(),
+	})
+	if err != nil {
+		return err
+	}
+	return writeEvalContextFile(destination, func(writer io.Writer) error {
+		var buffer bytes.Buffer
+		binary.Write(&buffer, binary.LittleEndian, uint32(len(parameters)))
+		buffer.Write(parameters)
+		buffer.WriteByte(0) // always has_sk=0, even for a client containing SK
+		buffer.WriteByte(1) // BTP includes PK
+		rlwe.CiphertextQPToBytes(context.pk, &context.parameter.Parameters, &buffer)
+		if _, err := buffer.WriteTo(writer); err != nil {
+			return err
+		}
+		buffer.WriteByte(byte(len(btpParameters)))
+		buffer.Write(btpParameters)
+		if err := streamEvalKeys(&context.CkksContext, elements, &buffer, writer); err != nil {
+			return err
+		}
+		dts, std := context.btp_parameter.GenEncapsulationSwitchingKeys(*context.parameter, context.sk)
+		if dts == nil {
+			buffer.WriteByte(0)
+		} else {
+			buffer.WriteByte(1)
+			rlwe.GadgetCiphertextToBytes(&dts.GadgetCiphertext, &sparse, &buffer)
+		}
+		if _, err := buffer.WriteTo(writer); err != nil {
+			return err
+		}
+		dts = nil
+		if std == nil {
+			buffer.WriteByte(0)
+		} else {
+			buffer.WriteByte(1)
+			rlwe.GadgetCiphertextToBytes(&std.GadgetCiphertext, &context.parameter.Parameters, &buffer)
+		}
+		_, err := buffer.WriteTo(writer)
+		return err
+	})
+}
+
+//export StreamSetupCkksBtpContextToFile
+func StreamSetupCkksBtpContextToFile(parameter_handle uint64, destination *C.char, context_handle *C.uint64_t) uint64 {
+	return evalContextStatus(func() error {
+		if context_handle == nil {
+			return errors.New("Missing output context handle")
+		}
+		*context_handle = 0
+		parameters := get_object[BtpParameterSet](parameter_handle)
+		context := &CkksBtpContext{
+			CkksContext:   *newStreamingCkksContext(&parameters.SchemeParam, false),
+			btp_parameter: &parameters.BtpParam,
+		}
+		if err := streamCkksBtpEvalContext(context, C.GoString(destination)); err != nil {
+			return err
+		}
+		// No evaluation keys or bootstrapper are retained by the client.
+		*context_handle = C.uint64_t(insert_object(context))
+		return nil
+	})
+}
+
+//export StreamExportCkksBtpEvalContextToFile
+func StreamExportCkksBtpEvalContextToFile(context_handle uint64, destination *C.char) uint64 {
+	return evalContextStatus(func() error {
+		return streamCkksBtpEvalContext(get_object[CkksBtpContext](context_handle), C.GoString(destination))
+	})
 }
 
 //export CreateCkksBtpParameter
