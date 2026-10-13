@@ -482,6 +482,12 @@ func CreateCkksBtpContextBootstrapper(context_handle uint64) {
 //export SerializeCkksBtpContextAdvanced
 func SerializeCkksBtpContextAdvanced(context_handle uint64, raw_data **byte, length *C.uint64_t) uint64 {
 	context := get_object[CkksBtpContext](context_handle)
+	// Streaming clients intentionally have no evaluation-key bundle. Their
+	// existing full-context persistence still contains SK/PK and parameters.
+	evk := context.evk
+	if evk == nil {
+		evk = new(bootstrapping.EvaluationKeys)
+	}
 	var data_slice []byte
 	writer := new(bytes.Buffer)
 
@@ -515,14 +521,14 @@ func SerializeCkksBtpContextAdvanced(context_handle uint64, raw_data **byte, len
 	writer.WriteByte(byte(len(btp_param_data)))
 	writer.Write(btp_param_data)
 
-	binary.Write(writer, binary.LittleEndian, context.evk.Rlk != nil)
-	if context.evk.Rlk != nil {
-		rlwe.RelinearizationKeyToByte(context.evk.Rlk, &context.parameter.Parameters, writer)
+	binary.Write(writer, binary.LittleEndian, evk.Rlk != nil)
+	if evk.Rlk != nil {
+		rlwe.RelinearizationKeyToByte(evk.Rlk, &context.parameter.Parameters, writer)
 	}
 
-	binary.Write(writer, binary.LittleEndian, context.evk.Rtks != nil)
-	if context.evk.Rtks != nil {
-		rlwe.RotationKeySetToBytes(context.evk.Rtks, &context.parameter.Parameters, writer)
+	binary.Write(writer, binary.LittleEndian, evk.Rtks != nil)
+	if evk.Rtks != nil {
+		rlwe.RotationKeySetToBytes(evk.Rtks, &context.parameter.Parameters, writer)
 	}
 
 	paramsSparse, _ := rlwe.NewParametersFromLiteral(rlwe.ParametersLiteral{
@@ -531,14 +537,14 @@ func SerializeCkksBtpContextAdvanced(context_handle uint64, raw_data **byte, len
 		P:    context.parameter.Parameters.P(),
 	})
 
-	binary.Write(writer, binary.LittleEndian, context.evk.SwkDtS != nil)
-	if context.evk.SwkDtS != nil {
-		rlwe.GadgetCiphertextToBytes(&context.evk.SwkDtS.GadgetCiphertext, &paramsSparse, writer)
+	binary.Write(writer, binary.LittleEndian, evk.SwkDtS != nil)
+	if evk.SwkDtS != nil {
+		rlwe.GadgetCiphertextToBytes(&evk.SwkDtS.GadgetCiphertext, &paramsSparse, writer)
 	}
 
-	binary.Write(writer, binary.LittleEndian, context.evk.SwkStD != nil)
-	if context.evk.SwkStD != nil {
-		rlwe.GadgetCiphertextToBytes(&context.evk.SwkStD.GadgetCiphertext, &context.parameter.Parameters, writer)
+	binary.Write(writer, binary.LittleEndian, evk.SwkStD != nil)
+	if evk.SwkStD != nil {
+		rlwe.GadgetCiphertextToBytes(&evk.SwkStD.GadgetCiphertext, &context.parameter.Parameters, writer)
 	}
 
 	data_slice = writer.Bytes()
@@ -649,7 +655,9 @@ func DeserializeCkksBtpContextAdvanced(raw_data *byte, length uint64) uint64 {
 	context.gk = context.evk.Rtks
 
 	init_ckks_context(&context.CkksContext)
-	context.bootstrapper, _ = bootstrapping.NewBootstrapper(*context.parameter, *context.btp_parameter, *context.evk)
+	if context.evk.Rlk != nil && context.evk.Rtks != nil {
+		context.bootstrapper, _ = bootstrapping.NewBootstrapper(*context.parameter, *context.btp_parameter, *context.evk)
+	}
 
 	id := insert_object(&context)
 	return id
