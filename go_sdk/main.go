@@ -8,9 +8,13 @@ import "C"
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
+	"io"
 	"math"
 	"math/bits"
+	"os"
+	"path/filepath"
 	"reflect"
 	"runtime"
 	"runtime/cgo"
@@ -527,6 +531,196 @@ func CreateRandomCkksContext(parameter_handle uint64, level int, support_big_com
 
 	id := insert_object(&context)
 	return id
+}
+
+// evalContextStatus keeps validation and generation failures inside the CGO boundary.
+func evalContextStatus(operation func() error) (status uint64) {
+	defer func() {
+		if value := recover(); value != nil {
+			error_message = fmt.Sprintf("Streaming evaluation context: %v", value)
+			status = 1
+		}
+	}()
+	if err := operation(); err != nil {
+		error_message = err.Error()
+		return 1
+	}
+	return 0
+}
+
+type evalContextFile interface {
+	io.Writer
+	Close() error
+	Name() string
+}
+
+// The private file/rename/remove arguments allow failure tests without changing serializers.
+func publishEvalContextFile(file evalContextFile, destination string, write func(io.Writer) error,
+	rename func(string, string) error, remove func(string) error) (err error) {
+	closed, published := false, false
+	defer func() {
+		if value := recover(); value != nil {
+			err = fmt.Errorf("Streaming evaluation context: %v", value)
+		}
+		if !closed {
+			err = errors.Join(err, file.Close())
+		}
+		if !published {
+			if cleanupErr := remove(file.Name()); cleanupErr != nil && !os.IsNotExist(cleanupErr) {
+				err = errors.Join(err, fmt.Errorf("clean up temporary file %s: %w", file.Name(), cleanupErr))
+			}
+		}
+	}()
+	if err = write(file); err != nil {
+		return err
+	}
+	err = file.Close()
+	closed = true
+	if err != nil {
+		return err
+	}
+	if err = rename(file.Name(), destination); err != nil {
+		return err
+	}
+	published = true
+	return nil
+}
+
+func writeEvalContextFile(destination string, write func(io.Writer) error) error {
+	if destination == "" {
+		return errors.New("Evaluation context destination is empty")
+	}
+	file, err := os.CreateTemp(filepath.Dir(destination), ".eval-context-*")
+	if err != nil {
+		return err
+	}
+	return publishEvalContextFile(file, destination, write, os.Rename, os.Remove)
+}
+
+func evalGaloisElements(params *ckks.Parameters, extraRotations []int) []uint64 {
+	seen := make(map[uint64]bool)
+	var elements []uint64
+	add := func(element uint64) {
+		if !seen[element] {
+			seen[element] = true
+			elements = append(elements, element)
+		}
+	}
+	for i := 0; i < params.LogN()-1; i++ {
+		add(params.GaloisElementForColumnRotationBy(1 << i))
+	}
+	for i := 0; i < params.LogN()-2; i++ {
+		add(params.GaloisElementForColumnRotationBy(-(1 << i)))
+	}
+	for _, rotation := range extraRotations {
+		add(params.GaloisElementForColumnRotationBy(rotation))
+	}
+	add(params.GaloisElementForRowRotation())
+	return elements
+}
+
+func validateEvalContext(context *CkksContext) error {
+	if context.parameter == nil || context.sk == nil {
+		return errors.New("Streaming evaluation context requires parameters and a secret key")
+	}
+	params := context.parameter
+	if params.PCount() == 0 || context.sk.Value.Q.N() != params.N() ||
+		context.sk.LevelQ() != params.MaxLevel() || context.sk.LevelP() != params.PCount()-1 {
+		return errors.New("Secret key does not match full Q/P evaluation parameters")
+	}
+	return nil
+}
+
+func validateEvalContextLengths(parameters []byte, elements []uint64) error {
+	if uint64(len(parameters)) > math.MaxUint32 || len(elements) > math.MaxUint16 {
+		return errors.New("Evaluation context parameter length or key count exceeds the binary format")
+	}
+	return nil
+}
+
+func newStreamingCkksContext(params *ckks.Parameters, supportBigComplex bool) *CkksContext {
+	context := &CkksContext{parameter: params, support_big_complex: supportBigComplex}
+	context.kgen = ckks.NewKeyGenerator(*params)
+	context.sk, context.pk = context.kgen.GenKeyPair()
+	init_ckks_context(context)
+	return context
+}
+
+func streamEvalKeys(context *CkksContext, elements []uint64, buffer *bytes.Buffer, writer io.Writer) error {
+	kgen := context.kgen
+	if kgen == nil {
+		kgen = ckks.NewKeyGenerator(*context.parameter)
+	}
+	buffer.WriteByte(1) // has_rlk
+	// Limit the key's lifetime to this payload, rather than keeping it in the context.
+	if err := func() error {
+		key := kgen.GenRelinearizationKey(context.sk, 1)
+		rlwe.RelinearizationKeyToByte(key, &context.parameter.Parameters, buffer)
+		_, err := buffer.WriteTo(writer)
+		return err
+	}(); err != nil {
+		return err
+	}
+	buffer.WriteByte(1) // has_rtks
+	binary.Write(buffer, binary.LittleEndian, uint16(len(elements)))
+	for _, element := range elements {
+		if err := func() error {
+			binary.Write(buffer, binary.LittleEndian, element)
+			key := kgen.GenSwitchingKeyForGalois(element, context.sk)
+			rlwe.SwitchingKeyToBytes(key, &context.parameter.Parameters, buffer)
+			_, err := buffer.WriteTo(writer)
+			return err
+		}(); err != nil {
+			return err
+		}
+	}
+	_, err := buffer.WriteTo(writer) // also flush flags/count if the set is empty
+	return err
+}
+
+func streamCkksEvalContext(context *CkksContext, destination string) error {
+	if err := validateEvalContext(context); err != nil {
+		return err
+	}
+	elements := evalGaloisElements(context.parameter, nil)
+	parameters, err := context.parameter.MarshalBinary()
+	if err != nil {
+		return err
+	}
+	if err = validateEvalContextLengths(parameters, elements); err != nil {
+		return err
+	}
+	return writeEvalContextFile(destination, func(writer io.Writer) error {
+		var buffer bytes.Buffer
+		binary.Write(&buffer, binary.BigEndian, uint32(len(parameters)))
+		buffer.Write(parameters)
+		buffer.WriteByte(0) // has_sk: never export client secret material
+		buffer.WriteByte(0) // ordinary CKKS evaluation contexts omit PK
+		return streamEvalKeys(context, elements, &buffer, writer)
+	})
+}
+
+//export StreamSetupCkksContextToFile
+func StreamSetupCkksContextToFile(parameter_handle uint64, destination *C.char, support_big_complex bool, context_handle *C.uint64_t) uint64 {
+	return evalContextStatus(func() error {
+		if context_handle == nil {
+			return errors.New("Missing output context handle")
+		}
+		*context_handle = 0
+		context := newStreamingCkksContext(get_object[ckks.Parameters](parameter_handle), support_big_complex)
+		if err := streamCkksEvalContext(context, C.GoString(destination)); err != nil {
+			return err
+		}
+		*context_handle = C.uint64_t(insert_object(context))
+		return nil
+	})
+}
+
+//export StreamExportCkksEvalContextToFile
+func StreamExportCkksEvalContextToFile(context_handle uint64, destination *C.char) uint64 {
+	return evalContextStatus(func() error {
+		return streamCkksEvalContext(get_object[CkksContext](context_handle), C.GoString(destination))
+	})
 }
 
 //export CreateRandomCkksContextWithSeed
