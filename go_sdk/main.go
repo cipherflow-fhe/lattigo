@@ -24,6 +24,7 @@ import (
 
 	"github.com/cipherflow-fhe/lattigo/bfv"
 	"github.com/cipherflow-fhe/lattigo/ckks"
+	"github.com/cipherflow-fhe/lattigo/clientcontext"
 	"github.com/cipherflow-fhe/lattigo/rlwe"
 	"github.com/cipherflow-fhe/lattigo/rlwe/ringqp"
 )
@@ -598,25 +599,7 @@ func writeEvalContextFile(destination string, write func(io.Writer) error) error
 }
 
 func evalGaloisElements(params *ckks.Parameters, extraRotations []int) []uint64 {
-	seen := make(map[uint64]bool)
-	var elements []uint64
-	add := func(element uint64) {
-		if !seen[element] {
-			seen[element] = true
-			elements = append(elements, element)
-		}
-	}
-	for i := 0; i < params.LogN()-1; i++ {
-		add(params.GaloisElementForColumnRotationBy(1 << i))
-	}
-	for i := 0; i < params.LogN()-2; i++ {
-		add(params.GaloisElementForColumnRotationBy(-(1 << i)))
-	}
-	for _, rotation := range extraRotations {
-		add(params.GaloisElementForColumnRotationBy(rotation))
-	}
-	add(params.GaloisElementForRowRotation())
-	return elements
+	return clientcontext.GaloisElements(*params, extraRotations)
 }
 
 func validateEvalContext(context *CkksContext) error {

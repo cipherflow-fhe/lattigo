@@ -32,6 +32,12 @@ typedef struct { const char *p; ptrdiff_t n; } _GoString_;
 
 #line 1 "cgo-generated-wrapper"
 
+#line 3 "client_context.go"
+
+#include <stdint.h>
+
+#line 1 "cgo-generated-wrapper"
+
 #line 3 "c_struct_import_export.go"
 
 #include "../../../abi/c_types.h"
@@ -316,6 +322,8 @@ extern void SetCkksBtpContextSwitchkeyStd(GoUint64 context_handle, GoUint64 swit
 extern void CreateCkksBtpContextBootstrapper(GoUint64 context_handle);
 extern GoUint64 SerializeCkksBtpContextAdvanced(GoUint64 context_handle, GoUint8** raw_data, uint64_t* length);
 extern GoUint64 DeserializeCkksBtpContextAdvanced(GoUint8* raw_data, GoUint64 length);
+extern GoUint64 SerializeCkksClientContext(GoUint64 context_handle, GoUint8 use_btp, GoUint8** raw_data, uint64_t* length, uint64_t* buffer_handle);
+extern GoUint64 DeserializeCkksClientContext(GoUint8* raw_data, GoUint64 length, GoUint64 parameter_handle, GoUint8 use_btp, uint64_t* context_handle);
 extern void ImportBfvCiphertext(GoUint64 dest_handle, CCiphertext* c_ciphertext);
 extern void ImportCkksCiphertext(GoUint64 dest_handle, CCiphertext* c_ciphertext);
 extern void ExportBfvPlaintextRingt(GoUint64 plaintext_ringt_handle, CPlaintext* c_plaintext);
