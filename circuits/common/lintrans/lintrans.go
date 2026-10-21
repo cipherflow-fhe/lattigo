@@ -78,6 +78,11 @@ type Parameters struct {
 	// If the value returned is negative, then the baby-step giant-step algorithm is not used
 	// and the evaluation complexity (as well as the number of keys) becomes O(n) instead of O(sqrt(n)).
 	LogBabyStepGiantStepRatio int
+
+	// UseDefaultRotationKeys indicates that rotations must be evaluated as chains of the default
+	// rotations ±2^i (for which Galois keys are expected to exist) instead of relying on exact
+	// rotation keys.
+	UseDefaultRotationKeys bool // @company CipherFlow
 }
 
 type Diagonals[T any] map[int][]T
@@ -130,6 +135,7 @@ type LinearTransformation struct {
 	N1                        int
 	LevelQ                    int
 	LevelP                    int
+	UseDefaultRotationKeys    bool // @company CipherFlow
 	Vec                       map[int]ringqp.Poly
 }
 
@@ -196,6 +202,7 @@ func NewLinearTransformation(params rlwe.ParameterProvider, ltparams Parameters)
 		N1:                        N1,
 		LevelQ:                    levelQ,
 		LevelP:                    levelP,
+		UseDefaultRotationKeys:    ltparams.UseDefaultRotationKeys, // @company CipherFlow
 		Vec:                       vec,
 	}
 }

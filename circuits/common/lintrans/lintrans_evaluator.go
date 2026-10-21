@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/cipherflow-fhe/lattigo/core/rlwe"
+	"github.com/cipherflow-fhe/lattigo/ring"
 	"github.com/cipherflow-fhe/lattigo/ring/ringqp"
 	"github.com/cipherflow-fhe/lattigo/schemes"
 	"github.com/cipherflow-fhe/lattigo/utils"
@@ -65,7 +66,7 @@ func (eval Evaluator) EvaluateMany(ctIn *rlwe.Ciphertext, linearTransformations 
 
 			_, _, rotN2 := lt.BSGSIndex()
 
-			if err = eval.PreRotatedCiphertextForDiagonalMatrixMultiplication(levelQ, levelP, ctIn, buffDecompQP, rotN2, ctPreRot); err != nil {
+			if err = eval.PreRotatedCiphertextForDiagonalMatrixMultiplication(levelQ, levelP, ctIn, buffDecompQP, rotN2, ctPreRot, lt.UseDefaultRotationKeys, 1<<lt.LogDimensions.Cols); err != nil { // @company CipherFlow
 				return
 			}
 
@@ -79,7 +80,17 @@ func (eval Evaluator) EvaluateMany(ctIn *rlwe.Ciphertext, linearTransformations 
 }
 
 // PreRotatedCiphertextForDiagonalMatrixMultiplication populates ctPreRot with the pre-rotated ciphertext for the rotations rots and deletes rotated ciphertexts that are not in rots.
-func (eval Evaluator) PreRotatedCiphertextForDiagonalMatrixMultiplication(levelQ, levelP int, ctIn *rlwe.Ciphertext, BuffDecompQP []ringqp.Poly, rots []int, ctPreRot map[int]*rlwe.Element[ringqp.Poly]) (err error) {
+// @company CipherFlow. If useDefaultRotationKeys is true, each rotation is evaluated as a chain of the default rotations ±2^i (see
+// [NAFRotationSubsteps]) with `slots` the number of plaintext slots. In this case BuffDecompQP (the RNS
+// decomposition of ctIn) is reused for the first substep of every chain.
+func (eval Evaluator) PreRotatedCiphertextForDiagonalMatrixMultiplication(
+	levelQ, levelP int,
+	ctIn *rlwe.Ciphertext,
+	BuffDecompQP []ringqp.Poly,
+	rots []int,
+	ctPreRot map[int]*rlwe.Element[ringqp.Poly],
+	useDefaultRotationKeys bool, slots int, // @company CipherFlow
+) (err error) {
 
 	params := eval.GetRLWEParameters()
 
@@ -100,10 +111,133 @@ func (eval Evaluator) PreRotatedCiphertextForDiagonalMatrixMultiplication(levelQ
 	for _, i := range rots {
 		if _, ok := ctPreRot[i]; i != 0 && !ok {
 			ctPreRot[i] = rlwe.NewElementExtended(params, 1, levelQ, levelP)
-			if err = eval.AutomorphismHoistedLazy(levelQ, ctIn, BuffDecompQP, params.GaloisElement(i), ctPreRot[i]); err != nil {
+			if useDefaultRotationKeys { // @company CipherFlow
+				if err = eval.rotateBySubstepsQP(levelQ, levelP, ctIn, BuffDecompQP, NAFRotationSubsteps(i, slots), ctPreRot[i]); err != nil {
+					return fmt.Errorf("eval.rotateBySubstepsQP: %w", err)
+				}
+			} else if err = eval.AutomorphismHoistedLazy(levelQ, ctIn, BuffDecompQP, params.GaloisElement(i), ctPreRot[i]); err != nil {
 				return fmt.Errorf("eval.AutomorphismHoistedLazy: %w", err)
 			}
 		}
+	}
+
+	return
+}
+
+// rotateBySubsteps evaluates the rotation by the given chain of substeps on ctIn and returns the
+// result as a normalized ciphertext modulo Q. Each substep must be a signed power of two for which a
+// Galois key exists. If ctInDecompQP is not nil, it must be the RNS decomposition of ctIn and is reused
+// for the first substep (it is never modified).
+// @company CipherFlow. 
+func (eval Evaluator) rotateBySubsteps(levelQ, levelP int, ctIn *rlwe.Ciphertext, ctInDecompQP []ringqp.Poly, substeps []int, opOut *rlwe.Ciphertext) (err error) {
+
+	poolQP := eval.pool.AtLevel(levelQ, levelP)
+
+	buffQP0 := poolQP.GetBuffPolyQP()
+	defer poolQP.RecycleBuffPolyQP(buffQP0)
+	buffQP1 := poolQP.GetBuffPolyQP()
+	defer poolQP.RecycleBuffPolyQP(buffQP1)
+
+	ctQP := &rlwe.Element[ringqp.Poly]{}
+	ctQP.Value = []ringqp.Poly{*buffQP0, *buffQP1}
+	ctQP.MetaData = &rlwe.MetaData{}
+	ctQP.IsNTT = true
+
+	if err = eval.rotateBySubstepsQP(levelQ, levelP, ctIn, ctInDecompQP, substeps, ctQP); err != nil {
+		return
+	}
+
+	eval.ModDownQPtoQNTT(levelQ, levelP, ctQP.Value[0].Q, ctQP.Value[0].P, opOut.Value[0])
+	eval.ModDownQPtoQNTT(levelQ, levelP, ctQP.Value[1].Q, ctQP.Value[1].P, opOut.Value[1])
+	opOut.IsNTT = ctIn.IsNTT
+
+	return
+}
+
+// rotateBySubstepsQP evaluates the rotation by the given chain of substeps on ctIn and returns the
+// result in the QP basis, scaled by P (i.e. as an un-normalized lazy automorphism would).
+// If ctInDecompQP is not nil, it must be the RNS decomposition of ctIn: it is used for the first substep
+// and is not modified (an internal buffer is used for the decompositions of the intermediate results).
+// @company CipherFlow
+func (eval Evaluator) rotateBySubstepsQP(levelQ, levelP int, ctIn *rlwe.Ciphertext, ctInDecompQP []ringqp.Poly, substeps []int, opOutQP *rlwe.Element[ringqp.Poly]) (err error) {
+
+	params := eval.GetRLWEParameters()
+
+	ringQP := params.RingQP().AtLevel(levelQ, levelP)
+	ringQ := ringQP.RingQ
+	ringP := ringQP.RingP
+	poolQP := eval.pool.AtLevel(levelQ, levelP)
+
+	if len(substeps) == 0 {
+		// Identity rotation: returns P*ctIn in the Q basis, with zero P residues.
+		ringQ.MulScalarBigint(ctIn.Value[0], ringP.ModulusAtLevel[levelP], opOutQP.Value[0].Q)
+		ringQ.MulScalarBigint(ctIn.Value[1], ringP.ModulusAtLevel[levelP], opOutQP.Value[1].Q)
+		opOutQP.Value[0].P.Zero()
+		opOutQP.Value[1].P.Zero()
+		return
+	}
+
+	// Decomposition used by the current substep. If it was provided by the caller, it must not be
+	// overwritten, so the decompositions of the intermediate results use a separate buffer.
+	compCur := ctInDecompQP
+
+	if compCur == nil {
+		compCur = poolQP.GetBuffDecompQP(*params, levelQ, levelP)
+		defer eval.pool.RecycleBuffDecompQP(compCur)
+		eval.DecomposeNTT(levelQ, levelP, levelP+1, ctIn.Value[1], ctIn.IsNTT, compCur)
+	}
+
+	// Fast path: a single substep writes the lazy automorphism result directly to the output,
+	// without allocating the intermediate buffers.
+	if len(substeps) == 1 {
+		return eval.AutomorphismHoistedLazy(levelQ, ctIn, compCur, params.GaloisElement(substeps[0]), opOutQP)
+	}
+
+	var decompNext []ringqp.Poly
+	if ctInDecompQP == nil {
+		// No other owner: the intermediate decompositions can overwrite the same buffer.
+		decompNext = compCur
+	} else {
+		decompNext = poolQP.GetBuffDecompQP(*params, levelQ, levelP)
+		defer eval.pool.RecycleBuffDecompQP(decompNext)
+	}
+
+	// Buffer holding the normalized intermediate ciphertext when chaining substeps.
+	buffCt := eval.pool.GetBuffCt(1, levelQ)
+	defer eval.pool.RecycleBuffCt(buffCt)
+	buffCt.MetaData = &rlwe.MetaData{}
+	buffCt.IsNTT = true
+
+	buffQP0 := poolQP.GetBuffPolyQP()
+	defer poolQP.RecycleBuffPolyQP(buffQP0)
+	buffQP1 := poolQP.GetBuffPolyQP()
+	defer poolQP.RecycleBuffPolyQP(buffQP1)
+
+	tmpQP := &rlwe.Element[ringqp.Poly]{}
+	tmpQP.Value = []ringqp.Poly{*buffQP0, *buffQP1}
+	tmpQP.MetaData = &rlwe.MetaData{}
+	tmpQP.IsNTT = true
+
+	ctCur := ctIn
+
+	for i, substep := range substeps {
+
+		// The last substep can write its result directly to the output.
+		if i == len(substeps)-1 {
+			return eval.AutomorphismHoistedLazy(levelQ, ctCur, compCur, params.GaloisElement(substep), opOutQP)
+		}
+
+		if err = eval.AutomorphismHoistedLazy(levelQ, ctCur, compCur, params.GaloisElement(substep), tmpQP); err != nil {
+			return fmt.Errorf("eval.AutomorphismHoistedLazy: %w", err)
+		}
+
+		// Normalizes the intermediate result modulo Q to be able to chain the next automorphism.
+		eval.ModDownQPtoQNTT(levelQ, levelP, tmpQP.Value[0].Q, tmpQP.Value[0].P, buffCt.Value[0])
+		eval.ModDownQPtoQNTT(levelQ, levelP, tmpQP.Value[1].Q, tmpQP.Value[1].P, buffCt.Value[1])
+
+		ctCur = buffCt
+		eval.DecomposeNTT(levelQ, levelP, levelP+1, ctCur.Value[1], true, decompNext)
+		compCur = decompNext
 	}
 
 	return
@@ -170,6 +304,10 @@ func (eval Evaluator) MultiplyByDiagMatrix(ctIn *rlwe.Ciphertext, matrix LinearT
 	defer eval.pool.RecycleBuffCt(buffCt)
 
 	opOut.Resize(opOut.Degree(), levelQ)
+
+	if matrix.UseDefaultRotationKeys { // @company CipherFlow
+		return eval.multiplyByDiagMatrixSubsteps(levelQ, levelP, ctIn, matrix, BuffDecompQP, opOut)
+	}
 
 	QiOverF := params.QiOverflowMargin(levelQ)
 	PiOverF := params.PiOverflowMargin(levelP)
@@ -273,6 +411,72 @@ func (eval Evaluator) MultiplyByDiagMatrix(ctIn *rlwe.Ciphertext, matrix LinearT
 	return
 }
 
+// multiplyByDiagMatrixSubsteps is the multiplication by a diagonal matrix where each non-zero diagonal is
+// reached by a chain of ±2^i rotations (i.e. using only the default rotation keys) before being multiplied
+// by its plaintext diagonal.
+// BuffDecompQP must be the RNS decomposition of ctIn; it is reused for the first substep of every rotation chain.
+// @company CipherFlow
+func (eval Evaluator) multiplyByDiagMatrixSubsteps(levelQ, levelP int, ctIn *rlwe.Ciphertext, matrix LinearTransformation, BuffDecompQP []ringqp.Poly, opOut *rlwe.Ciphertext) (err error) {
+
+	params := eval.GetRLWEParameters()
+	ringQ := params.RingQ().AtLevel(levelQ)
+
+	slots := 1 << matrix.LogDimensions.Cols
+
+	buffCt := eval.pool.GetBuffCt(1, ringQ.Level())
+	defer eval.pool.RecycleBuffCt(buffCt)
+	buffCt.MetaData = &rlwe.MetaData{}
+	buffCt.IsNTT = true
+
+	// Accumulator kept separate from opOut, as opOut may alias ctIn (which is read by the rotations).
+	accCt := eval.pool.GetBuffCt(1, ringQ.Level())
+	defer eval.pool.RecycleBuffCt(accCt)
+	accCt.Value[0].Zero()
+	accCt.Value[1].Zero()
+
+	keys := utils.GetSortedKeys(matrix.Vec)
+
+	QiOverF := params.QiOverflowMargin(levelQ)
+
+	for i, k := range keys {
+
+		k &= (slots - 1)
+
+		pt := matrix.Vec[k]
+
+		c0, c1 := ctIn.Value[0], ctIn.Value[1]
+
+		// Rotation by zero: multiply the input directly instead of running an empty substep chain.
+		if k != 0 {
+			if err = eval.rotateBySubsteps(levelQ, levelP, ctIn, BuffDecompQP, NAFRotationSubsteps(k, slots), buffCt); err != nil {
+				return fmt.Errorf("cannot MultiplyByDiagMatrix: %w", err)
+			}
+			c0, c1 = buffCt.Value[0], buffCt.Value[1]
+		}
+
+		if i == 0 {
+			ringQ.MulCoeffsMontgomery(pt.Q, c0, accCt.Value[0])
+			ringQ.MulCoeffsMontgomery(pt.Q, c1, accCt.Value[1])
+		} else {
+			ringQ.MulCoeffsMontgomeryThenAdd(pt.Q, c0, accCt.Value[0])
+			ringQ.MulCoeffsMontgomeryThenAdd(pt.Q, c1, accCt.Value[1])
+		}
+
+		if i%QiOverF == QiOverF-1 {
+			ringQ.Reduce(accCt.Value[0], accCt.Value[0])
+			ringQ.Reduce(accCt.Value[1], accCt.Value[1])
+		}
+	}
+
+	ringQ.Reduce(accCt.Value[0], accCt.Value[0])
+	ringQ.Reduce(accCt.Value[1], accCt.Value[1])
+
+	opOut.Value[0].CopyLvl(levelQ, accCt.Value[0])
+	opOut.Value[1].CopyLvl(levelQ, accCt.Value[1])
+
+	return
+}
+
 // MultiplyByDiagMatrixBSGS multiplies the Ciphertext "ctIn" by the plaintext matrix "matrix" and returns the result on the Ciphertext "opOut".
 // ctInPreRotated can be obtained with [PreRotatedCiphertextForDiagonalMatrixMultiplication].
 // The BSGS approach is used (double hoisting with baby-step giant-step), which is faster than MultiplyByDiagMatrix
@@ -314,6 +518,8 @@ func (eval Evaluator) MultiplyByDiagMatrixBSGS(ctIn *rlwe.Ciphertext, matrix Lin
 
 	// Computes the N2 rotations indexes of the non-zero rows of the diagonalized DFT matrix for the baby-step giant-step algorithm
 	index, _, _ := matrix.BSGSIndex()
+
+	slots := 1 << matrix.LogDimensions.Cols // @company CipherFlow
 
 	buffCt.Value[0].CopyLvl(levelQ, ctIn.Value[0])
 	buffCt.Value[1].CopyLvl(levelQ, ctIn.Value[1])
@@ -396,37 +602,64 @@ func (eval Evaluator) MultiplyByDiagMatrixBSGS(ctIn *rlwe.Ciphertext, matrix Lin
 		// If j != 0, then rotates ((tmp0QP.Q, tmp0QP.P), (tmp1QP.Q, tmp1QP.P)) by N1*j and adds the result on ((cQP.Value[0].Q, cQP.Value[0].P), (cQP.Value[1].Q, cQP.Value[1].P))
 		if j != 0 {
 
-			// Hoisting of the ModDown of sum(sum(phi(d1) * plaintext))
-			eval.ModDownQPtoQNTT(levelQ, levelP, tmp1QP.Q, tmp1QP.P, tmp1QP.Q) // c1 * plaintext + sum(phi(d1) * plaintext) + phi(c1) * plaintext mod Q
+			if matrix.UseDefaultRotationKeys { // @company CipherFlow
 
-			galEl := params.GaloisElement(j)
+				// Normalizes the giant-step accumulator modulo Q.
+				eval.ModDownQPtoQNTT(levelQ, levelP, tmp1QP.Q, tmp1QP.P, tmp1QP.Q)
+				eval.ModDownQPtoQNTT(levelQ, levelP, tmp0QP.Q, tmp0QP.P, tmp0QP.Q)
 
-			var evk *rlwe.GaloisKey
-			var err error
-			if evk, err = eval.CheckAndGetGaloisKey(galEl); err != nil {
-				return fmt.Errorf("eval.CheckAndGetGaloisKey(%d): CheckAndGetGaloisKey: %w", galEl, err)
-			}
+				ctTmp := &rlwe.Ciphertext{Element: rlwe.Element[ring.Poly]{
+					MetaData: &rlwe.MetaData{CiphertextMetaData: rlwe.CiphertextMetaData{IsNTT: true}},
+					Value:    []ring.Poly{tmp0QP.Q, tmp1QP.Q},
+				}}
 
-			if evk.LevelP() != levelP {
-				return fmt.Errorf("LinearTransformation.LevelP = %d != GaloiKey[%d].LevelP() = %d: ensure that the levelP of the linear transformation is the same as the levelP of the GaloisKeys", levelP, galEl, evk.LevelP())
-			}
+				if err = eval.rotateBySubstepsQP(levelQ, levelP, ctTmp, nil, NAFRotationSubsteps(j, slots), cQP); err != nil {
+					return fmt.Errorf("eval.rotateBySubstepsQP: %w", err)
+				}
 
-			rotIndex := eval.AutomorphismIndex(galEl)
+				if cnt0 == 0 {
+					c0OutQP.CopyLvl(levelQ, levelP, cQP.Value[0])
+					c1OutQP.CopyLvl(levelQ, levelP, cQP.Value[1])
+				} else {
+					ringQP.AddLazy(c0OutQP, cQP.Value[0], c0OutQP)
+					ringQP.AddLazy(c1OutQP, cQP.Value[1], c1OutQP)
+				}
 
-			// EvaluationKey(P*phi(tmpRes_1)) = (d0, d1) in base QP
-			if err = eval.GadgetProductLazy(levelQ, tmp1QP.Q, &evk.GadgetCiphertext, cQP); err != nil {
-				return fmt.Errorf("eval.GadgetProductLazy: %w", err)
-			}
-
-			ringQP.Add(cQP.Value[0], tmp0QP, cQP.Value[0])
-
-			// Outer loop rotations
-			if cnt0 == 0 {
-				ringQP.AutomorphismNTTWithIndex(cQP.Value[0], rotIndex, c0OutQP)
-				ringQP.AutomorphismNTTWithIndex(cQP.Value[1], rotIndex, c1OutQP)
 			} else {
-				ringQP.AutomorphismNTTWithIndexThenAddLazy(cQP.Value[0], rotIndex, c0OutQP)
-				ringQP.AutomorphismNTTWithIndexThenAddLazy(cQP.Value[1], rotIndex, c1OutQP)
+
+				// Hoisting of the ModDown of sum(sum(phi(d1) * plaintext))
+				eval.ModDownQPtoQNTT(levelQ, levelP, tmp1QP.Q, tmp1QP.P, tmp1QP.Q) // c1 * plaintext + sum(phi(d1) * plaintext) + phi(c1) * plaintext mod Q
+
+				galEl := params.GaloisElement(j)
+
+				var evk *rlwe.GaloisKey
+				var err error
+				if evk, err = eval.CheckAndGetGaloisKey(galEl); err != nil {
+					return fmt.Errorf("eval.CheckAndGetGaloisKey(%d): CheckAndGetGaloisKey: %w", galEl, err)
+				}
+
+				if evk.LevelP() != levelP {
+					return fmt.Errorf("LinearTransformation.LevelP = %d != GaloiKey[%d].LevelP() = %d: ensure that the levelP of the linear transformation is the same as the levelP of the GaloisKeys", levelP, galEl, evk.LevelP())
+				}
+
+				rotIndex := eval.AutomorphismIndex(galEl)
+
+				// EvaluationKey(P*phi(tmpRes_1)) = (d0, d1) in base QP
+				if err = eval.GadgetProductLazy(levelQ, tmp1QP.Q, &evk.GadgetCiphertext, cQP); err != nil {
+					return fmt.Errorf("eval.GadgetProductLazy: %w", err)
+				}
+
+				ringQP.Add(cQP.Value[0], tmp0QP, cQP.Value[0])
+
+				// Outer loop rotations
+				if cnt0 == 0 {
+					ringQP.AutomorphismNTTWithIndex(cQP.Value[0], rotIndex, c0OutQP)
+					ringQP.AutomorphismNTTWithIndex(cQP.Value[1], rotIndex, c1OutQP)
+				} else {
+					ringQP.AutomorphismNTTWithIndexThenAddLazy(cQP.Value[0], rotIndex, c0OutQP)
+					ringQP.AutomorphismNTTWithIndexThenAddLazy(cQP.Value[1], rotIndex, c1OutQP)
+				}
+
 			}
 
 			// Else directly adds on ((cQP.Value[0].Q, cQP.Value[0].P), (cQP.Value[1].Q, cQP.Value[1].P))

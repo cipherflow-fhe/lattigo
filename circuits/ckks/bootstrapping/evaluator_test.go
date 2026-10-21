@@ -34,11 +34,12 @@ func TestParametersMarshalling(t *testing.T) {
 		paramsLit := ParametersLiteral{
 			CoeffsToSlotsFactorizationDepthAndLogScales: [][]int{{53}, {53}, {53}, {53}},
 			SlotsToCoeffsFactorizationDepthAndLogScales: [][]int{{30}, {30, 30}},
-			EvalModLogScale:       utils.Pointy(59),
-			EphemeralSecretWeight: utils.Pointy(1),
-			IterationsParameters:  &IterationsParameters{BootstrappingPrecision: []float64{20, 20}, ReservedPrimeBitSize: 20},
-			Mod1Degree:            utils.Pointy(32),
-			Mod1InvDegree:         utils.Pointy(7),
+			EvalModLogScale:        utils.Pointy(59),
+			EphemeralSecretWeight:  utils.Pointy(1),
+			IterationsParameters:   &IterationsParameters{BootstrappingPrecision: []float64{20, 20}, ReservedPrimeBitSize: 20},
+			Mod1Degree:             utils.Pointy(32),
+			Mod1InvDegree:          utils.Pointy(7),
+			UseDefaultRotationKeys: true, // @company CipherFlow
 		}
 
 		data, err := paramsLit.MarshalBinary()
@@ -53,6 +54,7 @@ func TestParametersMarshalling(t *testing.T) {
 
 	t.Run("Parameters", func(t *testing.T) {
 		paramSet := DefaultParametersSparse[0]
+		paramSet.BootstrappingParams.UseDefaultRotationKeys = true // @company CipherFlow
 
 		params, err := ckks.NewParametersFromLiteral(paramSet.SchemeParams)
 		require.Nil(t, err)

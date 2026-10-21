@@ -297,6 +297,127 @@ func run(tc *ckks.TestContext, t *testing.T) {
 
 		ckks.VerifyTestVectors(params, tc.Ecd, tc.Dec, values, ciphertext, params.LogDefaultScale(), 0, *printPrecisionStats, t)
 	})
+
+	t.Run(name("LinearTransform/BSGS=False/DefaultRotationKeys", tc), func(t *testing.T) { // @company CipherFlow
+
+		if params.RingType() != ring.Standard {
+			t.Skip("default rotation keys are only supported for the standard ring")
+		}
+
+		t.Parallel()
+
+		values, _, ciphertext := tc.NewTestVector(-1-1i, 1+1i)
+
+		slots := ciphertext.Slots()
+
+		nonZeroDiags := []int{-15, -4, -1, 0, 1, 2, 3, 4, 15}
+
+		one := new(big.Float).SetInt64(1)
+		zero := new(big.Float)
+
+		diagonals := make(Diagonals[*bignum.Complex])
+		for _, i := range nonZeroDiags {
+			diagonals[i] = make([]*bignum.Complex, slots)
+			for j := 0; j < slots; j++ {
+				diagonals[i][j] = &bignum.Complex{one, zero}
+			}
+		}
+
+		ltparams := Parameters{
+			DiagonalsIndexList:        diagonals.DiagonalsIndexList(),
+			LevelQ:                    ciphertext.Level(),
+			LevelP:                    params.MaxLevelP(),
+			Scale:                     rlwe.NewScale(params.Q()[ciphertext.Level()]),
+			LogDimensions:             ciphertext.LogDimensions,
+			LogBabyStepGiantStepRatio: -1,
+			UseDefaultRotationKeys:    true,
+		}
+
+		linTransf := NewTransformation(params, ltparams)
+
+		require.NoError(t, Encode(tc.Ecd, diagonals, linTransf))
+
+		galEls := defaultRotationGaloisElements(params)
+
+		evk := rlwe.NewMemEvaluationKeySet(nil, tc.Kgen.GenGaloisKeysNew(galEls, tc.Sk)...)
+
+		ltEval := NewEvaluator(tc.Evl.WithKey(evk))
+
+		require.NoError(t, ltEval.Evaluate(ciphertext, linTransf, ciphertext))
+
+		values = diagonals.Evaluate(values, newVec, add, muladd)
+
+		ckks.VerifyTestVectors(params, tc.Ecd, tc.Dec, values, ciphertext, params.LogDefaultScale(), 0, *printPrecisionStats, t)
+	})
+
+	t.Run(name("LinearTransform/BSGS=True/DefaultRotationKeys", tc), func(t *testing.T) { // @company CipherFlow
+
+		if params.RingType() != ring.Standard {
+			t.Skip("default rotation keys are only supported for the standard ring")
+		}
+
+		t.Parallel()
+
+		values, _, ciphertext := tc.NewTestVector(-1-1i, 1+1i)
+
+		slots := ciphertext.Slots()
+
+		nonZeroDiags := []int{-15, -4, -1, 0, 1, 2, 3, 4, 15}
+
+		one := new(big.Float).SetInt64(1)
+		zero := new(big.Float)
+
+		diagonals := make(Diagonals[*bignum.Complex])
+		for _, i := range nonZeroDiags {
+			diagonals[i] = make([]*bignum.Complex, slots)
+			for j := 0; j < slots; j++ {
+				diagonals[i][j] = &bignum.Complex{one, zero}
+			}
+		}
+
+		ltparams := Parameters{
+			DiagonalsIndexList:        diagonals.DiagonalsIndexList(),
+			LevelQ:                    ciphertext.Level(),
+			LevelP:                    params.MaxLevelP(),
+			Scale:                     params.GetOptimalScalingFactor(ciphertext.Scale, params.DefaultScale(), ciphertext.Level()),
+			LogDimensions:             ciphertext.LogDimensions,
+			LogBabyStepGiantStepRatio: 1,
+			UseDefaultRotationKeys:    true,
+		}
+
+		linTransf := NewTransformation(params, ltparams)
+
+		require.NoError(t, Encode(tc.Ecd, diagonals, linTransf))
+
+		galEls := defaultRotationGaloisElements(params)
+
+		evk := rlwe.NewMemEvaluationKeySet(nil, tc.Kgen.GenGaloisKeysNew(galEls, tc.Sk)...)
+
+		ltEval := NewEvaluator(tc.Evl.WithKey(evk))
+
+		require.NoError(t, ltEval.Evaluate(ciphertext, linTransf, ciphertext))
+
+		values = diagonals.Evaluate(values, newVec, add, muladd)
+
+		ckks.VerifyTestVectors(params, tc.Ecd, tc.Dec, values, ciphertext, params.LogDefaultScale(), 0, *printPrecisionStats, t)
+	})
+}
+
+// defaultRotationGaloisElements returns the Galois elements of the default rotations ±2^i, plus complex conjugation.
+//
+// @company CipherFlow
+func defaultRotationGaloisElements(params ckks.Parameters) []uint64 {
+
+	keys := map[uint64]bool{}
+
+	for i := 0; i < params.LogN()-1; i++ {
+		keys[params.GaloisElement(1<<i)] = true
+		keys[params.GaloisElement(-(1 << i))] = true
+	}
+
+	keys[params.GaloisElementForComplexConjugation()] = true
+
+	return utils.GetSortedKeys(keys)
 }
 
 var (

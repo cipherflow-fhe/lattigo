@@ -32,6 +32,9 @@ type Parameters struct {
 	EphemeralSecretWeight int
 	// CircuitOrder: Value indicating the order of the circuit (default: ModUpThenEncode)
 	CircuitOrder CircuitOrder
+	// @company CipherFlow. UseDefaultRotationKeys: if true, only the default rotations ±2^i (plus complex conjugation) are keyed,
+	// and arbitrary rotations are decomposed into chains of default rotations (default: false)
+	UseDefaultRotationKeys bool
 }
 
 // NewParametersFromLiteral instantiates a [Parameters] from the residual [ckks.Parameters] and
@@ -127,12 +130,13 @@ func NewParametersFromLiteral(residualParameters ckks.Parameters, btpLit Paramet
 
 	// SlotsToCoeffs parameters (homomorphic decoding)
 	S2CParams := dft.MatrixLiteral{
-		Type:         dft.HomomorphicDecode,
-		LogSlots:     LogSlots,
-		Format:       dft.RepackImagAsReal,
-		LevelQ:       residualParameters.MaxLevel() + len(SlotsToCoeffsFactorizationDepthAndLogScales) + hasReservedIterationPrime,
-		LogBSGSRatio: 1,
-		Levels:       SlotsToCoeffsLevels,
+		Type:                   dft.HomomorphicDecode,
+		LogSlots:               LogSlots,
+		Format:                 dft.RepackImagAsReal,
+		LevelQ:                 residualParameters.MaxLevel() + len(SlotsToCoeffsFactorizationDepthAndLogScales) + hasReservedIterationPrime,
+		LogBSGSRatio:           1,
+		Levels:                 SlotsToCoeffsLevels,
+		UseDefaultRotationKeys: btpLit.UseDefaultRotationKeys, // @company CipherFlow
 	}
 
 	// Scaling factor of the homomorphic modular reduction x mod 1
@@ -202,12 +206,13 @@ func NewParametersFromLiteral(residualParameters ckks.Parameters, btpLit Paramet
 
 	// Parameters of the CoeffsToSlots (homomorphic encoding)
 	C2SParams := dft.MatrixLiteral{
-		Type:         dft.HomomorphicEncode,
-		Format:       dft.RepackImagAsReal,
-		LogSlots:     LogSlots,
-		LevelQ:       Mod1ParametersLiteral.LevelQ + len(CoeffsToSlotsFactorizationDepthAndLogScales),
-		LogBSGSRatio: 1,
-		Levels:       CoeffsToSlotsLevels,
+		Type:                   dft.HomomorphicEncode,
+		Format:                 dft.RepackImagAsReal,
+		LogSlots:               LogSlots,
+		LevelQ:                 Mod1ParametersLiteral.LevelQ + len(CoeffsToSlotsFactorizationDepthAndLogScales),
+		LogBSGSRatio:           1,
+		Levels:                 CoeffsToSlotsLevels,
+		UseDefaultRotationKeys: btpLit.UseDefaultRotationKeys, // @company CipherFlow
 	}
 
 	// List of the prime-size of all primes required by the bootstrapping circuit.
@@ -299,13 +304,13 @@ func NewParametersFromLiteral(residualParameters ckks.Parameters, btpLit Paramet
 
 			for {
 				// @company CipherFlow begin ---
-				var qi uint64 
+				var qi uint64
 				var err error
-				if isLogP { 
-					qi, err = g.NextDownstreamPrime() 
-				} else { 
-					qi, err = g.NextAlternatingPrime() 
-				} 
+				if isLogP {
+					qi, err = g.NextDownstreamPrime()
+				} else {
+					qi, err = g.NextAlternatingPrime()
+				}
 				// @company CipherFlow end ---
 
 				// qi, err := g.NextAlternatingPrime() // @company CipherFlow
@@ -374,6 +379,7 @@ func NewParametersFromLiteral(residualParameters ckks.Parameters, btpLit Paramet
 		Mod1ParametersLiteral:   Mod1ParametersLiteral,
 		CoeffsToSlotsParameters: C2SParams,
 		IterationsParameters:    iterParams,
+		UseDefaultRotationKeys:  btpLit.UseDefaultRotationKeys, // @company CipherFlow
 	}, nil
 }
 
@@ -385,6 +391,7 @@ func (p Parameters) Equal(other *Parameters) (res bool) {
 	res = res && cmp.Equal(p.Mod1ParametersLiteral, other.Mod1ParametersLiteral)
 	res = res && cmp.Equal(p.CoeffsToSlotsParameters, other.CoeffsToSlotsParameters)
 	res = res && cmp.Equal(p.IterationsParameters, other.IterationsParameters)
+	res = res && p.UseDefaultRotationKeys == other.UseDefaultRotationKeys // @company CipherFlow
 	return
 }
 
@@ -440,6 +447,7 @@ func (p Parameters) MarshalJSON() (data []byte, err error) {
 		IterationsParameters    *IterationsParameters
 		EphemeralSecretWeight   int
 		CircuitOrder            int
+		UseDefaultRotationKeys  bool // @company CipherFlow
 	}{
 		ResidualParameters:      p.ResidualParameters,
 		BootstrappingParameters: p.BootstrappingParameters,
@@ -449,6 +457,7 @@ func (p Parameters) MarshalJSON() (data []byte, err error) {
 		IterationsParameters:    p.IterationsParameters,
 		EphemeralSecretWeight:   p.EphemeralSecretWeight,
 		CircuitOrder:            int(p.CircuitOrder),
+		UseDefaultRotationKeys:  p.UseDefaultRotationKeys, // @company CipherFlow
 	})
 }
 
@@ -462,6 +471,7 @@ func (p *Parameters) UnmarshalJSON(data []byte) (err error) {
 		IterationsParameters    *IterationsParameters
 		EphemeralSecretWeight   int
 		CircuitOrder            int
+		UseDefaultRotationKeys  bool // @company CipherFlow
 	}
 
 	if err = json.Unmarshal(data, &params); err != nil {
@@ -476,6 +486,7 @@ func (p *Parameters) UnmarshalJSON(data []byte) (err error) {
 	p.IterationsParameters = params.IterationsParameters
 	p.EphemeralSecretWeight = params.EphemeralSecretWeight
 	p.CircuitOrder = CircuitOrder(params.CircuitOrder)
+	p.UseDefaultRotationKeys = params.UseDefaultRotationKeys // @company CipherFlow
 
 	return
 }
@@ -488,17 +499,29 @@ func (p Parameters) GaloisElements(params ckks.Parameters) (galEls []uint64) {
 	// List of the rotation key values to needed for the bootstrap
 	keys := make(map[uint64]bool)
 
-	//SubSum rotation needed X -> Y^slots rotations
-	for i := p.LogMaxDimensions().Cols; i < logN-1; i++ {
-		keys[params.GaloisElement(1<<i)] = true
-	}
+	if p.UseDefaultRotationKeys { // @company CipherFlow
 
-	for _, galEl := range p.CoeffsToSlotsParameters.GaloisElements(params) {
-		keys[galEl] = true
-	}
+		// Only the rotations ±2^i (i = 0, ..., logN-2) are keyed. The map deduplicates the
+		// +2^{logN-2} / -2^{logN-2} collision, as both are the same automorphism.
+		for i := 0; i < logN-1; i++ {
+			keys[params.GaloisElement(1<<i)] = true
+			keys[params.GaloisElement(-(1 << i))] = true
+		}
 
-	for _, galEl := range p.SlotsToCoeffsParameters.GaloisElements(params) {
-		keys[galEl] = true
+	} else {
+
+		//SubSum rotation needed X -> Y^slots rotations
+		for i := p.LogMaxDimensions().Cols; i < logN-1; i++ {
+			keys[params.GaloisElement(1<<i)] = true
+		}
+
+		for _, galEl := range p.CoeffsToSlotsParameters.GaloisElements(params) {
+			keys[galEl] = true
+		}
+
+		for _, galEl := range p.SlotsToCoeffsParameters.GaloisElements(params) {
+			keys[galEl] = true
+		}
 	}
 
 	keys[params.GaloisElementForComplexConjugation()] = true

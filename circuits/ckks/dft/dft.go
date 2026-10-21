@@ -82,6 +82,9 @@ type MatrixLiteral struct {
 	Scaling      *big.Float // Default 1.0.
 	BitReversed  bool       // Default: False.
 	LogBSGSRatio int        // Default: 0.
+	// UseDefaultRotationKeys: if true, rotations are evaluated as chains of the default
+	// rotations ±2^i instead of being keyed exactly. Default: false.
+	UseDefaultRotationKeys bool // @company CipherFlow
 }
 
 // Depth returns the number of levels allocated to the linear transform.
@@ -100,12 +103,25 @@ func (d MatrixLiteral) Depth(actual bool) (depth int) {
 
 // GaloisElements returns the list of rotations performed during the CoeffsToSlot operation.
 func (d MatrixLiteral) GaloisElements(params ckks.Parameters) (galEls []uint64) {
+
+	logN := params.LogN()
+
+	if d.UseDefaultRotationKeys { // @company CipherFlow
+		// Only the default rotations ±2^i and the complex conjugation are required.
+		keys := make(map[uint64]bool)
+		for i := 0; i < logN-1; i++ {
+			keys[params.GaloisElement(1<<i)] = true
+			keys[params.GaloisElement(-(1 << i))] = true
+		}
+		keys[params.GaloisElementForComplexConjugation()] = true
+		return utils.GetSortedKeys(keys)
+	}
+
 	rotations := []int{}
 
 	imgRepack := d.Format == RepackImagAsReal
 
 	logSlots := d.LogSlots
-	logN := params.LogN()
 	slots := 1 << logSlots
 	dslots := slots
 	if logSlots < logN-1 && imgRepack {
@@ -200,6 +216,7 @@ func NewMatrixFromLiteral(params ckks.Parameters, d MatrixLiteral, encoder *ckks
 				Scale:                     scale,
 				LogDimensions:             ring.Dimensions{Rows: 0, Cols: logdSlots},
 				LogBabyStepGiantStepRatio: d.LogBSGSRatio,
+				UseDefaultRotationKeys:    d.UseDefaultRotationKeys, // @company CipherFlow
 			}
 
 			mat := ltcommon.NewTransformation(params, ltparams)

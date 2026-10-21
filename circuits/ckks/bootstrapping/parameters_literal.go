@@ -122,6 +122,11 @@ import (
 // DoubleAngle: the number of double angle evaluation. By default set to 3.
 //
 // Mod1InvDegree: the degree of the f^-1: (x mod 1)^-1, by default set to 0.
+//
+// @company CipherFlow. UseDefaultRotationKeys: if true, the Galois keys are only generated for the rotations ±2^i
+// (plus complex conjugation), and every other rotation required by the linear transformations is evaluated as a chain
+// of these default rotations decomposed with the non-adjacent form (NAF). This significantly reduces the size of the
+// evaluation keys at the expense of additional key-switches. By default set to false (exact rotation keys).
 type ParametersLiteral struct {
 	LogN                                        *int                        // Default: 16
 	LogP                                        []int                       // Default: 61 * max(1, floor(sqrt(#Qi)))
@@ -139,6 +144,7 @@ type ParametersLiteral struct {
 	Mod1Degree                                  *int                        // Default: 30
 	DoubleAngle                                 *int                        // Default: 3
 	Mod1InvDegree                               *int                        // Default: 0
+	UseDefaultRotationKeys                      bool                        // Default: false // @company CipherFlow
 }
 
 type CircuitOrder int
