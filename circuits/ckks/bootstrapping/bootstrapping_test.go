@@ -542,6 +542,188 @@ func TestBootstrapping(t *testing.T) {
 	})
 }
 
+// @company CipherFlow
+// TestNativeConjugateInvariantBootstrapping exercises the native conjugate-invariant
+// bootstrapping path, which evaluates the circuit directly in the
+// conjugate-invariant ring using the factorized real DFT (no domain switch).
+func TestNativeConjugateInvariantBootstrapping(t *testing.T) {
+
+	// The native path keeps the residual and bootstrapping rings at the same
+	// conjugate-invariant degree (no ring switch), so the bootstrapping LogN is
+	// the residual LogN.
+	schemeParamsLit := testPrec45
+	schemeParamsLit.RingType = ring.ConjugateInvariant
+
+	if *flagLongTest {
+		schemeParamsLit.LogN = 16
+	}
+
+	params, err := ckks.NewParametersFromLiteral(schemeParamsLit)
+	require.NoError(t, err)
+
+	sk := rlwe.NewKeyGenerator(params).GenSecretKeyNew()
+	ecd := ckks.NewEncoder(params)
+	enc := rlwe.NewEncryptor(params, sk)
+	dec := rlwe.NewDecryptor(params, sk)
+
+	// The bootstrapping circuit always runs at full packing; the sparse encoding
+	// is a property of the residual (input) ciphertext.
+	btpParamsLit := ParametersLiteral{
+		LogN: utils.Pointy(params.LogN()),
+		// Evaluate the circuit directly in the conjugate-invariant ring.
+		NativeCI: true,
+	}
+
+	btpParams, err := NewParametersFromLiteral(params, btpParamsLit)
+	require.NoError(t, err)
+
+	// The circuit must take the native conjugate-invariant path.
+	require.True(t, btpParams.isNativeCI())
+	require.Equal(t, ring.ConjugateInvariant, btpParams.BootstrappingParameters.RingType())
+	require.Equal(t, params.LogN(), btpParams.BootstrappingParameters.LogN())
+
+	// Corrects the message ratio to take into account the smaller number of slots.
+	btpParams.Mod1ParametersLiteral.LogMessageRatio += 16 - params.LogN()
+
+	btpKeys, _, err := btpParams.GenEvaluationKeys(sk)
+	require.NoError(t, err)
+
+	evaluator, err := NewEvaluator(btpParams, btpKeys)
+	require.NoError(t, err)
+
+	t.Run("FullPacking", func(t *testing.T) {
+
+		values := make([]float64, params.MaxSlots())
+		for i := range values {
+			values[i] = sampling.RandFloat64(-1, 1)
+		}
+
+		values[0] = 0.9238795325112867
+		values[1] = 0.9238795325112867
+		if len(values) > 2 {
+			values[2] = 0.9238795325112867
+			values[3] = 0.9238795325112867
+		}
+
+		plaintext := ckks.NewPlaintext(params, 0)
+		require.NoError(t, ecd.Encode(values, plaintext))
+
+		ctQ0, err := enc.EncryptNew(plaintext)
+		require.NoError(t, err)
+		require.True(t, ctQ0.Level() == 0)
+
+		ctQL, err := evaluator.Bootstrap(ctQ0)
+		require.NoError(t, err)
+
+		require.True(t, ctQL.Level() == params.MaxLevel())
+		require.True(t, ctQL.Scale.Equal(params.DefaultScale()))
+
+		verifyTestVectorsBootstrapping(params, ecd, dec, values, ctQL, t)
+	})
+
+	t.Run("SparseEncoding", func(t *testing.T) {
+
+		logSlots := params.LogN() - 1
+		values := make([]float64, 1<<logSlots)
+		for i := range values {
+			values[i] = sampling.RandFloat64(-1, 1)
+		}
+
+		values[0] = 0.9238795325112867
+		values[1] = 0.9238795325112867
+		if len(values) > 2 {
+			values[2] = 0.9238795325112867
+			values[3] = 0.9238795325112867
+		}
+
+		plaintext := ckks.NewPlaintext(params, 0)
+		plaintext.LogDimensions = ring.Dimensions{Rows: 0, Cols: logSlots}
+		require.NoError(t, ecd.Encode(values, plaintext))
+
+		ctQ0, err := enc.EncryptNew(plaintext)
+		require.NoError(t, err)
+		require.True(t, ctQ0.Level() == 0)
+
+		ctQL, err := evaluator.Bootstrap(ctQ0)
+		require.NoError(t, err)
+
+		require.True(t, ctQL.Level() == params.MaxLevel())
+		require.True(t, ctQL.Scale.Equal(params.DefaultScale()))
+
+		verifyTestVectorsBootstrapping(params, ecd, dec, values, ctQL, t)
+	})
+
+	t.Run("RingDegreeSwitch", func(t *testing.T) {
+
+		// Residual CI ring with a smaller degree than the bootstrapping ring; the
+		// residual primes must be congruent to 1 modulo the bootstrap ring's
+		// NthRoot (4*2^bootstrapLogN = 2^(bootstrapLogN+2)).
+		schemeParamsLit := testPrec45
+		schemeParamsLit.RingType = ring.ConjugateInvariant
+
+		if *flagLongTest {
+			schemeParamsLit.LogN = 16
+		}
+
+		bootstrapLogN := schemeParamsLit.LogN
+		schemeParamsLit.LogNthRoot = bootstrapLogN + 2
+		schemeParamsLit.LogN -= 3
+
+		params, err := ckks.NewParametersFromLiteral(schemeParamsLit)
+		require.NoError(t, err)
+
+		btpParams, err := NewParametersFromLiteral(params, ParametersLiteral{
+			LogN:     utils.Pointy(bootstrapLogN),
+			NativeCI: true,
+		})
+		require.NoError(t, err)
+
+		require.True(t, btpParams.isNativeCI())
+		require.Equal(t, ring.ConjugateInvariant, btpParams.BootstrappingParameters.RingType())
+		require.Greater(t, btpParams.BootstrappingParameters.N(), params.N())
+
+		btpParams.Mod1ParametersLiteral.LogMessageRatio += 16 - params.LogN()
+
+		sk := rlwe.NewKeyGenerator(params).GenSecretKeyNew()
+		ecd := ckks.NewEncoder(params)
+		enc := rlwe.NewEncryptor(params, sk)
+		dec := rlwe.NewDecryptor(params, sk)
+
+		btpKeys, _, err := btpParams.GenEvaluationKeys(sk)
+		require.NoError(t, err)
+
+		evaluator, err := NewEvaluator(btpParams, btpKeys)
+		require.NoError(t, err)
+
+		values := make([]float64, params.MaxSlots())
+		for i := range values {
+			values[i] = sampling.RandFloat64(-1, 1)
+		}
+
+		values[0] = 0.9238795325112867
+		values[1] = 0.9238795325112867
+		if len(values) > 2 {
+			values[2] = 0.9238795325112867
+			values[3] = 0.9238795325112867
+		}
+
+		plaintext := ckks.NewPlaintext(params, 0)
+		require.NoError(t, ecd.Encode(values, plaintext))
+
+		ctQ0, err := enc.EncryptNew(plaintext)
+		require.NoError(t, err)
+		require.True(t, ctQ0.Level() == 0)
+
+		ctQL, err := evaluator.Bootstrap(ctQ0)
+		require.NoError(t, err)
+
+		require.True(t, ctQL.Level() == params.MaxLevel())
+		require.True(t, ctQL.Scale.Equal(params.DefaultScale()))
+
+		verifyTestVectorsBootstrapping(params, ecd, dec, values, ctQL, t)
+	})
+}
+
 func verifyTestVectorsBootstrapping(params ckks.Parameters, encoder *ckks.Encoder, decryptor *rlwe.Decryptor, valuesWant, element interface{}, t *testing.T) {
 	precStats := ckks.GetPrecisionStats(params, encoder, decryptor, valuesWant, element, 0, false)
 	if *printPrecisionStats {

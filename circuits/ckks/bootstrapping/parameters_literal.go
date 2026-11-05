@@ -144,7 +144,13 @@ type ParametersLiteral struct {
 	Mod1Degree                                  *int                        // Default: 30
 	DoubleAngle                                 *int                        // Default: 3
 	Mod1InvDegree                               *int                        // Default: 0
-	UseDefaultRotationKeys                      bool                        // Default: false // @company CipherFlow
+
+	UseDefaultRotationKeys bool // Default: false // @company CipherFlow
+	// NativeCI enables the native conjugate-invariant bootstrapping, which
+	// evaluates the circuit directly in the conjugate-invariant ring using the
+	// real DFT (no domain switch). It requires the residual parameters to be
+	// conjugate-invariant and the bootstrapping LogN to equal the residual LogN.
+	NativeCI bool // @company CipherFlow
 }
 
 type CircuitOrder int
@@ -184,6 +190,9 @@ const (
 	DefaultDoubleAngle = 3
 	// DefaultMod1InvDegree is the default degree of the f^-1: (x mod 1)^-1 polynomial for the homomorphic modular reduction.
 	DefaultMod1InvDegree = 0
+	// DefaultNativeCI is the default value of the NativeCI flag: the bootstrapping
+	// uses the standard ring (with a domain switch) unless NativeCI is enabled.
+	DefaultNativeCI = false // @company CipherFlow
 )
 
 var (
@@ -263,19 +272,25 @@ func (p ParametersLiteral) GetLogP(NumberOfQi int) (LogP []int) {
 }
 
 // GetLogSlots returns the LogSlots field of the target [ParametersLiteral].
-// The default value LogN-1 is returned if the field is nil.
+// The default value is LogN-1 for the standard bootstrapping and LogN (full
+// packing) for the native conjugate-invariant bootstrapping.
 func (p ParametersLiteral) GetLogSlots() (LogSlots int, err error) {
 
 	LogN := p.GetLogN()
 
+	maxLogSlots := LogN - 1 // @company CipherFlow
+	if p.NativeCI {         // @company CipherFlow
+		maxLogSlots = LogN
+	}
+
 	if v := p.LogSlots; v == nil {
-		LogSlots = LogN - 1
+		LogSlots = maxLogSlots // @company CipherFlow
 
 	} else {
 		LogSlots = *v
 
-		if LogSlots < 1 || LogSlots > LogN-1 {
-			return LogSlots, fmt.Errorf("field LogSlots cannot be smaller than 1 or greater than LogN-1")
+		if LogSlots < 1 || LogSlots > maxLogSlots { // @company CipherFlow
+			return LogSlots, fmt.Errorf("field LogSlots cannot be smaller than 1 or greater than %d", maxLogSlots)
 		}
 	}
 

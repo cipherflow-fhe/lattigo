@@ -9,6 +9,7 @@ import (
 	"slices"
 
 	ltcommon "github.com/cipherflow-fhe/lattigo/circuits/ckks/lintrans"
+	"github.com/cipherflow-fhe/lattigo/circuits/ckks/realdft"
 	"github.com/cipherflow-fhe/lattigo/circuits/common/lintrans"
 	"github.com/cipherflow-fhe/lattigo/core/rlwe"
 	"github.com/cipherflow-fhe/lattigo/ring"
@@ -70,6 +71,8 @@ type Matrix struct {
 //   - Scaling: constant by which the matrix is multiplied
 //   - BitReversed: if true, then applies the transformation bit-reversed and expects bit-reversed inputs
 //   - LogBSGSRatio: log2 of the ratio between the inner and outer loop of the baby-step giant-step algorithm
+//   - Real: if true, generate the factorized real DFT for the conjugate-invariant
+//     ring instead of the complex DFT (Format and BitReversed are ignored).
 type MatrixLiteral struct {
 	// Mandatory
 	Type     Type
@@ -85,6 +88,7 @@ type MatrixLiteral struct {
 	// UseDefaultRotationKeys: if true, rotations are evaluated as chains of the default
 	// rotations ±2^i instead of being keyed exactly. Default: false.
 	UseDefaultRotationKeys bool // @company CipherFlow
+	Real                   bool // Default: False. // @company CipherFlow
 }
 
 // Depth returns the number of levels allocated to the linear transform.
@@ -101,8 +105,27 @@ func (d MatrixLiteral) Depth(actual bool) (depth int) {
 	return
 }
 
+// toReal maps the common fields of this literal to a [realdft.MatrixLiteral].
+// Format and BitReversed are ignored (the real DFT has no such options).
+// @company CipherFlow
+func (d MatrixLiteral) toReal() realdft.MatrixLiteral {
+	return realdft.MatrixLiteral{
+		Type:         realdft.Type(d.Type),
+		LogSlots:     d.LogSlots,
+		LevelQ:       d.LevelQ,
+		LevelP:       d.LevelP,
+		Levels:       d.Levels,
+		LogBSGSRatio: d.LogBSGSRatio,
+		Scaling:      d.Scaling,
+	}
+}
+
 // GaloisElements returns the list of rotations performed during the CoeffsToSlot operation.
 func (d MatrixLiteral) GaloisElements(params ckks.Parameters) (galEls []uint64) {
+
+	if d.Real { // @company CipherFlow
+		return d.toReal().GaloisElements(params)
+	}
 
 	logN := params.LogN()
 
@@ -178,6 +201,14 @@ func NewEvaluator(params ckks.Parameters, eval *ckks.Evaluator) *Evaluator {
 // NewMatrixFromLiteral generates the factorized DFT/IDFT matrices for the homomorphic encoding/decoding.
 func NewMatrixFromLiteral(params ckks.Parameters, d MatrixLiteral, encoder *ckks.Encoder) (Matrix, error) {
 
+	if d.Real { // @company CipherFlow
+		rm, err := realdft.NewMatrixFromLiteral(params, d.toReal(), encoder)
+		if err != nil {
+			return Matrix{}, err
+		}
+		return Matrix{MatrixLiteral: d, Matrices: rm.Matrices}, nil
+	}
+
 	logSlots := d.LogSlots
 	logdSlots := logSlots
 	if maxLogSlots := params.LogMaxDimensions().Cols; logdSlots < maxLogSlots && d.Format == RepackImagAsReal {
@@ -241,6 +272,12 @@ func NewMatrixFromLiteral(params ckks.Parameters, d MatrixLiteral, encoder *ckks
 // If the packing is sparse (n < N/2), then returns ctReal = Ecd(vReal || vImag) and ctImag = nil.
 // If the packing is dense (n == N/2), then returns ctReal = Ecd(vReal) and ctImag = Ecd(vImag).
 func (eval *Evaluator) CoeffsToSlotsNew(ctIn *rlwe.Ciphertext, ctsMatrices Matrix) (ctReal, ctImag *rlwe.Ciphertext, err error) {
+	if ctsMatrices.Real { // @company CipherFlow
+		// The real DFT directly yields the single real slot vector.
+		ctReal = ckks.NewCiphertext(eval.parameters, 1, ctsMatrices.LevelQ)
+		return ctReal, nil, eval.dft(ctIn, ctsMatrices, ctReal)
+	}
+
 	ctReal = ckks.NewCiphertext(eval.parameters, 1, ctsMatrices.LevelQ)
 
 	if ctsMatrices.LogSlots == eval.parameters.LogMaxSlots() {

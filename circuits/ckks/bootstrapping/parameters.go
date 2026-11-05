@@ -35,6 +35,9 @@ type Parameters struct {
 	// @company CipherFlow. UseDefaultRotationKeys: if true, only the default rotations ±2^i (plus complex conjugation) are keyed,
 	// and arbitrary rotations are decomposed into chains of default rotations (default: false)
 	UseDefaultRotationKeys bool
+	// NativeCI: If true, the bootstrapping is evaluated directly in the
+	// conjugate-invariant ring using the real DFT (no domain switch).
+	NativeCI bool // @company CipherFlow
 }
 
 // NewParametersFromLiteral instantiates a [Parameters] from the residual [ckks.Parameters] and
@@ -58,20 +61,40 @@ func NewParametersFromLiteral(residualParameters ckks.Parameters, btpLit Paramet
 	// Retrieve the LogN of the bootstrapping circuit
 	LogN := btpLit.GetLogN()
 
+	// nativeCI is true when the bootstrapping is evaluated directly in the
+	// conjugate-invariant ring (no domain switch), i.e. the residual and
+	// bootstrapping parameters share the same conjugate-invariant ring degree.
+	nativeCI := btpLit.NativeCI // @company CipherFlow
+
 	// Retrieve the NthRoot
 	var NthRoot uint64
 	switch residualParameters.RingType() {
 	case ring.ConjugateInvariant:
 
-		// If ConjugateInvariant, then the bootstrapping LogN must be at least 1 greater
-		// than the residualParameters LogN
-		if LogN != residualParameters.LogN()+1 {
-			return Parameters{}, fmt.Errorf("cannot NewParametersFromLiteral: LogN of bootstrapping parameters must be equal to LogN+ of residual parameters if ringtype is ConjugateInvariant")
+		// If ConjugateInvariant, the bootstrapping LogN may either be equal to the
+		// residualParameters LogN (native CI bootstrapping, evaluated in the same
+		// ring using the real DFT) or 1 greater (bootstrapping in the standard ring
+		// after a domain switch).
+		if nativeCI { // @company CipherFlow
+			// Native CI mirrors the standard ring: the bootstrapping LogN can be
+			// greater than or equal to the residual LogN.
+			if LogN < residualParameters.LogN() {
+				return Parameters{}, fmt.Errorf("cannot NewParametersFromLiteral: native conjugate-invariant bootstrapping requires LogN of bootstrapping parameters to be greater or equal to LogN of residual parameters")
+			}
+		} else if LogN != residualParameters.LogN()+1 {
+			return Parameters{}, fmt.Errorf("cannot NewParametersFromLiteral: LogN of bootstrapping parameters must be equal to LogN+1 of residual parameters if ringtype is ConjugateInvariant and NativeCI is false")
 		}
 
-		// Takes the greatest NthRoot between the residualParameters NthRoot and the bootstrapping NthRoot
+		// The bootstrapping ring determines the NthRoot the residual primes must
+		// be congruent to 1 modulo.
 		/* #nosec G115 -- N cannot be negative */
-		NthRoot = utils.Max(uint64(residualParameters.N()<<2), uint64(2<<LogN))
+		if nativeCI { // @company CipherFlow
+			// Native conjugate-invariant ring of degree 2^LogN has NthRoot 2^(LogN+2).
+			NthRoot = uint64(4 << LogN)
+		} else {
+			// Standard ring of degree 2^LogN has NthRoot 2^(LogN+1).
+			NthRoot = utils.Max(uint64(residualParameters.N()<<2), uint64(2<<LogN))
+		}
 
 	default:
 
@@ -137,6 +160,7 @@ func NewParametersFromLiteral(residualParameters ckks.Parameters, btpLit Paramet
 		LogBSGSRatio:           1,
 		Levels:                 SlotsToCoeffsLevels,
 		UseDefaultRotationKeys: btpLit.UseDefaultRotationKeys, // @company CipherFlow
+		Real:                   nativeCI,                      // @company CipherFlow
 	}
 
 	// Scaling factor of the homomorphic modular reduction x mod 1
@@ -213,6 +237,7 @@ func NewParametersFromLiteral(residualParameters ckks.Parameters, btpLit Paramet
 		LogBSGSRatio:           1,
 		Levels:                 CoeffsToSlotsLevels,
 		UseDefaultRotationKeys: btpLit.UseDefaultRotationKeys, // @company CipherFlow
+		Real:                   nativeCI,                      // @company CipherFlow
 	}
 
 	// List of the prime-size of all primes required by the bootstrapping circuit.
@@ -358,10 +383,19 @@ func NewParametersFromLiteral(residualParameters ckks.Parameters, btpLit Paramet
 	}
 
 	// Instantiates the ckks.Parameters of the bootstrapping circuit.
+	// The bootstrapping ring uses the standard ring type unless the circuit is
+	// evaluated natively in the conjugate-invariant ring.
+	// @company CipherFlow
+	btpRingType := ring.Standard
+	if nativeCI {
+		btpRingType = ring.ConjugateInvariant
+	}
+
 	params, err := ckks.NewParametersFromLiteral(ckks.ParametersLiteral{
 		LogN:            LogN,
 		Q:               Q,
 		P:               P,
+		RingType:        btpRingType, // @company CipherFlow
 		LogDefaultScale: LogDefaultScale,
 		Xs:              btpLit.GetDefaultXs(),
 		Xe:              btpLit.GetDefaultXe(),
@@ -380,6 +414,7 @@ func NewParametersFromLiteral(residualParameters ckks.Parameters, btpLit Paramet
 		CoeffsToSlotsParameters: C2SParams,
 		IterationsParameters:    iterParams,
 		UseDefaultRotationKeys:  btpLit.UseDefaultRotationKeys, // @company CipherFlow
+		NativeCI:                nativeCI,                      // @company CipherFlow
 	}, nil
 }
 
@@ -392,6 +427,7 @@ func (p Parameters) Equal(other *Parameters) (res bool) {
 	res = res && cmp.Equal(p.CoeffsToSlotsParameters, other.CoeffsToSlotsParameters)
 	res = res && cmp.Equal(p.IterationsParameters, other.IterationsParameters)
 	res = res && p.UseDefaultRotationKeys == other.UseDefaultRotationKeys // @company CipherFlow
+	res = res && p.NativeCI == other.NativeCI                             // @company CipherFlow
 	return
 }
 
@@ -448,6 +484,7 @@ func (p Parameters) MarshalJSON() (data []byte, err error) {
 		EphemeralSecretWeight   int
 		CircuitOrder            int
 		UseDefaultRotationKeys  bool // @company CipherFlow
+		NativeCI                bool // @company CipherFlow
 	}{
 		ResidualParameters:      p.ResidualParameters,
 		BootstrappingParameters: p.BootstrappingParameters,
@@ -458,6 +495,7 @@ func (p Parameters) MarshalJSON() (data []byte, err error) {
 		EphemeralSecretWeight:   p.EphemeralSecretWeight,
 		CircuitOrder:            int(p.CircuitOrder),
 		UseDefaultRotationKeys:  p.UseDefaultRotationKeys, // @company CipherFlow
+		NativeCI:                p.NativeCI,               // @company CipherFlow
 	})
 }
 
@@ -472,6 +510,7 @@ func (p *Parameters) UnmarshalJSON(data []byte) (err error) {
 		EphemeralSecretWeight   int
 		CircuitOrder            int
 		UseDefaultRotationKeys  bool // @company CipherFlow
+		NativeCI                bool // @company CipherFlow
 	}
 
 	if err = json.Unmarshal(data, &params); err != nil {
@@ -487,6 +526,7 @@ func (p *Parameters) UnmarshalJSON(data []byte) (err error) {
 	p.EphemeralSecretWeight = params.EphemeralSecretWeight
 	p.CircuitOrder = CircuitOrder(params.CircuitOrder)
 	p.UseDefaultRotationKeys = params.UseDefaultRotationKeys // @company CipherFlow
+	p.NativeCI = params.NativeCI                             // @company CipherFlow
 
 	return
 }
@@ -524,7 +564,17 @@ func (p Parameters) GaloisElements(params ckks.Parameters) (galEls []uint64) {
 		}
 	}
 
-	keys[params.GaloisElementForComplexConjugation()] = true
+	// @company CipherFlow: the real DFT never conjugates slots.
+	if !p.isNativeCI() {
+		keys[params.GaloisElementForComplexConjugation()] = true
+	}
 
 	return utils.GetSortedKeys(keys)
+}
+
+// isNativeCI reports whether the bootstrapping is evaluated directly in the
+// conjugate-invariant ring, using the real DFT instead of a domain switch.
+// @company CipherFlow
+func (p Parameters) isNativeCI() bool {
+	return p.NativeCI
 }

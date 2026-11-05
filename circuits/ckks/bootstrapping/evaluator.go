@@ -41,6 +41,10 @@ type Evaluator struct {
 	S2CDFTMatrix   dft.Matrix
 	C2SDFTMatrix   dft.Matrix
 
+	// nativeCI is true when the bootstrapping is evaluated directly in the
+	// conjugate-invariant ring using the real DFT, without a domain switch.
+	nativeCI bool // @company CipherFlow
+
 	SkDebug *rlwe.SecretKey
 
 	pool *rlwe.BufferPool
@@ -54,23 +58,34 @@ func NewEvaluator(btpParams Parameters, evk *EvaluationKeys) (eval *Evaluator, e
 	paramsN1 := btpParams.ResidualParameters
 	paramsN2 := btpParams.BootstrappingParameters
 
+	// Native conjugate-invariant bootstrapping: the residual and bootstrapping
+	// parameters share the same conjugate-invariant ring, so the circuit is
+	// evaluated in place with the real DFT and no domain switch.
+	eval.nativeCI = btpParams.NativeCI // @company CipherFlow
+
 	switch paramsN1.RingType() {
 	case ring.Standard:
 		if paramsN1.N() != paramsN2.N() && (evk.EvkN1ToN2 == nil || evk.EvkN2ToN1 == nil) {
 			return nil, fmt.Errorf("cannot NewBootstrapper: evk.(BootstrappingKeys) is missing EvkN1ToN2 and EvkN2ToN1")
 		}
 	case ring.ConjugateInvariant:
-		if evk.EvkCmplxToReal == nil || evk.EvkRealToCmplx == nil {
+		if !eval.nativeCI { // @company CipherFlow: no domain switch for the native CI path.
+			if evk.EvkCmplxToReal == nil || evk.EvkRealToCmplx == nil {
+				return nil, fmt.Errorf("cannot NewBootstrapper: evk.(BootstrappingKeys) is missing EvkN1ToN2 and EvkN2ToN1")
+			}
+
+			var err error
+			if eval.DomainSwitcher, err = ckks.NewDomainSwitcher(paramsN2, evk.EvkCmplxToReal, evk.EvkRealToCmplx); err != nil {
+				return nil, fmt.Errorf("cannot NewBootstrapper: ckks.NewDomainSwitcher: %w", err)
+			}
+
+			// The switch to standard to conjugate invariant multiplies the scale by 2
+			btpParams.SlotsToCoeffsParameters.Scaling = new(big.Float).SetFloat64(0.5)
+		} else if paramsN1.N() != paramsN2.N() && (evk.EvkN1ToN2 == nil || evk.EvkN2ToN1 == nil) { // @company CipherFlow
+			// Native CI with a larger bootstrapping ring degree needs the ring
+			// degree switch keys (no domain switch).
 			return nil, fmt.Errorf("cannot NewBootstrapper: evk.(BootstrappingKeys) is missing EvkN1ToN2 and EvkN2ToN1")
 		}
-
-		var err error
-		if eval.DomainSwitcher, err = ckks.NewDomainSwitcher(paramsN2, evk.EvkCmplxToReal, evk.EvkRealToCmplx); err != nil {
-			return nil, fmt.Errorf("cannot NewBootstrapper: ckks.NewDomainSwitcher: %w", err)
-		}
-
-		// The switch to standard to conjugate invariant multiplies the scale by 2
-		btpParams.SlotsToCoeffsParameters.Scaling = new(big.Float).SetFloat64(0.5)
 	}
 
 	eval.Parameters = btpParams
@@ -230,9 +245,10 @@ func (eval Evaluator) BootstrapMany(cts []rlwe.Ciphertext) ([]rlwe.Ciphertext, e
 
 	var err error
 
-	switch eval.ResidualParameters.RingType() {
-	case ring.ConjugateInvariant:
+	switch {
+	case eval.ResidualParameters.RingType() == ring.ConjugateInvariant && !eval.nativeCI:
 
+		// Non-native CI: bootstrap pairs of ciphertexts through a domain switch.
 		for i := 0; i < len(cts); i = i + 2 {
 
 			even, odd := i, i+1
@@ -255,8 +271,22 @@ func (eval Evaluator) BootstrapMany(cts []rlwe.Ciphertext) ([]rlwe.Ciphertext, e
 			}
 		}
 
+	case eval.nativeCI && eval.ResidualParameters.N() == eval.BootstrappingParameters.N(): // @company CipherFlow
+
+		// @company CipherFlow: the native CI path bootstraps each ciphertext
+		// independently, with no domain switch or repacking.
+		for i := range cts {
+			var ct *rlwe.Ciphertext
+			if ct, err = eval.Evaluate(&cts[i]); err != nil {
+				return nil, fmt.Errorf("cannot BootstrapMany: %w", err)
+			}
+			cts[i] = *ct
+		}
+
 	default:
 
+		// Standard ring, or native CI with a larger bootstrapping ring degree:
+		// pack, switch ring degree, bootstrap and unpack.
 		ctsPacked, ctxt1, ctxt2, err := eval.PackAndSwitchN1ToN2(cts)
 		if err != nil {
 			return nil, fmt.Errorf("cannot BootstrapMany: %w", err)

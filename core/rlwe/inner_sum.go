@@ -47,6 +47,16 @@ func (eval Evaluator) Trace(ctIn *Ciphertext, logN int, opOut *Ciphertext) (err 
 
 	*opOut.MetaData = *ctIn.MetaData
 
+	// @company CipherFlow: full packing (logN >= params.LogN()) requires no
+	// sub-sum: the Trace is the identity and there is no power-of-two gap left to
+	// fold over. Handling it separately also avoids a negative shift below.
+	if logN >= params.LogN() {
+		if ctIn != opOut {
+			opOut.Copy(ctIn)
+		}
+		return nil
+	}
+
 	gap := 1 << (params.LogN() - logN - 1)
 
 	if logN == 0 {

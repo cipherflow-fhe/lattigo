@@ -80,7 +80,7 @@ func (p Parameters) GenEvaluationKeys(skN1 *rlwe.SecretKey) (btpkeys *Evaluation
 		// (if the residual parameters are Conjugate Invariant, N1 = N2/2)
 		skN2 = kgen.GenSecretKeyNew()
 
-		if p.ResidualParameters.RingType() == ring.ConjugateInvariant {
+		if p.ResidualParameters.RingType() == ring.ConjugateInvariant && !p.NativeCI { // @company CipherFlow
 			EvkCmplxToReal, EvkRealToCmplx = kgen.GenEvaluationKeysForRingSwapNew(skN2, skN1)
 		} else {
 			EvkN1ToN2 = kgen.GenEvaluationKeyNew(skN1, skN2)
@@ -106,7 +106,13 @@ func (p Parameters) GenEvaluationKeys(skN1 *rlwe.SecretKey) (btpkeys *Evaluation
 	EvkDenseToSparse, EvkSparseToDense := p.genEncapsulationEvaluationKeysNew(skN2)
 
 	rlk := kgen.GenRelinearizationKeyNew(skN2)
-	gks := kgen.GenGaloisKeysNew(append(p.GaloisElements(paramsN2), paramsN2.GaloisElementForComplexConjugation()), skN2)
+
+	galEls := p.GaloisElements(paramsN2)
+	// @company CipherFlow: the conjugation key does not exist in the CI ring.
+	if paramsN2.RingType() != ring.ConjugateInvariant {
+		galEls = append(galEls, paramsN2.GaloisElementForComplexConjugation())
+	}
+	gks := kgen.GenGaloisKeysNew(galEls, skN2)
 
 	return &EvaluationKeys{
 		EvkN1ToN2:           EvkN1ToN2,
@@ -129,9 +135,10 @@ func (p Parameters) genEncapsulationEvaluationKeysNew(skDense *rlwe.SecretKey) (
 	}
 
 	paramsSparse, _ := rlwe.NewParametersFromLiteral(rlwe.ParametersLiteral{
-		LogN: params.LogN(),
-		Q:    params.Q()[:1],
-		P:    params.P(), // @company CipherFlow
+		LogN:     params.LogN(),
+		Q:        params.Q()[:1],
+		P:        params.P(),        // @company CipherFlow
+		RingType: params.RingType(), // @company CipherFlow
 	})
 
 	kgenSparse := rlwe.NewKeyGenerator(paramsSparse)
