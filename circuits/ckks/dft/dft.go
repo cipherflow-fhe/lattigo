@@ -110,13 +110,14 @@ func (d MatrixLiteral) Depth(actual bool) (depth int) {
 // @company CipherFlow
 func (d MatrixLiteral) toReal() realdft.MatrixLiteral {
 	return realdft.MatrixLiteral{
-		Type:         realdft.Type(d.Type),
-		LogSlots:     d.LogSlots,
-		LevelQ:       d.LevelQ,
-		LevelP:       d.LevelP,
-		Levels:       d.Levels,
-		LogBSGSRatio: d.LogBSGSRatio,
-		Scaling:      d.Scaling,
+		Type:                   realdft.Type(d.Type),
+		LogSlots:               d.LogSlots,
+		LevelQ:                 d.LevelQ,
+		LevelP:                 d.LevelP,
+		Levels:                 d.Levels,
+		LogBSGSRatio:           d.LogBSGSRatio,
+		Scaling:                d.Scaling,
+		UseDefaultRotationKeys: d.UseDefaultRotationKeys,
 	}
 }
 

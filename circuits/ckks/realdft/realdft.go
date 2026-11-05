@@ -74,6 +74,9 @@ type MatrixLiteral struct {
 	// Scaling is an optional constant by which the whole transform is multiplied.
 	// It is spread uniformly across the factorized matrices. Default 1.0.
 	Scaling *big.Float
+	// UseDefaultRotationKeys: if true, rotations are evaluated as chains of the
+	// default rotations ±2^i instead of being keyed exactly. Default: false.
+	UseDefaultRotationKeys bool
 }
 
 // Matrix stores the factorized real DFT matrices.
@@ -162,6 +165,7 @@ func NewMatrixFromLiteral(params ckks.Parameters, d MatrixLiteral, encoder *ckks
 				Scale:                     scale,
 				LogDimensions:             ring.Dimensions{Rows: 0, Cols: d.LogSlots},
 				LogBabyStepGiantStepRatio: d.LogBSGSRatio,
+				UseDefaultRotationKeys:    d.UseDefaultRotationKeys,
 			}
 
 			mat := ltcommon.NewTransformation(params, ltparams)
@@ -480,7 +484,7 @@ func scaleDiagonals(diags ltcommon.Diagonals[float64], norm float64) ltcommon.Di
 func (d MatrixLiteral) genDiagonals() []ltcommon.Diagonals[float64] {
 
 	N := 1 << d.LogSlots
-	
+
 	roots := ckks.GetRootsComplex128(4 * N)
 	pow5 := make([]int, N)
 	pow5[0] = 1

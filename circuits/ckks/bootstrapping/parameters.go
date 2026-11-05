@@ -541,9 +541,11 @@ func (p Parameters) GaloisElements(params ckks.Parameters) (galEls []uint64) {
 
 	if p.UseDefaultRotationKeys { // @company CipherFlow
 
-		// Only the rotations ±2^i (i = 0, ..., logN-2) are keyed. The map deduplicates the
-		// +2^{logN-2} / -2^{logN-2} collision, as both are the same automorphism.
-		for i := 0; i < logN-1; i++ {
+		// Only the rotations ±2^i are keyed; arbitrary rotations are decomposed
+		// into chains of these (NAF). The upper bound is LogMaxSlots so that the
+		// native conjugate-invariant ring (which packs one extra slot bit) also
+		// gets its largest default rotation.
+		for i := 0; i < params.LogMaxSlots(); i++ {
 			keys[params.GaloisElement(1<<i)] = true
 			keys[params.GaloisElement(-(1 << i))] = true
 		}
