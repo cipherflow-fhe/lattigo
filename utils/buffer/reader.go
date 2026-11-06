@@ -8,6 +8,36 @@ import (
 
 // ReadAsUint64 reads an uint64 from r and stores the result into c with pointer type casting into type T.
 func ReadAsUint64[T any](r Reader, c *T) (n int64, err error) {
+	if c == nil {
+		return 0, fmt.Errorf("cannot ReadAsUint64: c is nil")
+	}
+	switch v := any(c).(type) {
+	case *int:
+		var u uint64
+		n, err = ReadUint64(r, &u)
+		if err != nil {
+			return n, err
+		}
+		if u > uint64(^uint(0)>>1) {
+			return n, fmt.Errorf("uint64 value %d exceeds int range", u)
+		}
+		*v = int(u)
+		return n, nil
+	case *uint:
+		var u uint64
+		n, err = ReadUint64(r, &u)
+		if err != nil {
+			return n, err
+		}
+		if u > uint64(^uint(0)) {
+			return n, fmt.Errorf("uint64 value %d exceeds uint range", u)
+		}
+		*v = uint(u)
+		return n, nil
+	}
+	if unsafe.Sizeof(*c) < 8 {
+		return 0, fmt.Errorf("cannot cast uint64 to %T: value is smaller than 8 bytes", *c)
+	}
 	/* #nosec G103 -- behavior and consequences well understood, pointer type cast */
 	return ReadUint64(r, (*uint64)(unsafe.Pointer(c)))
 }

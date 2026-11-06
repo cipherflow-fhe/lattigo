@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"slices"
 
 	"github.com/cipherflow-fhe/lattigo/core/rlwe"
 	"github.com/cipherflow-fhe/lattigo/ring"
@@ -67,80 +68,183 @@ type EvaluationKeys struct {
 //   - !WARNING! The bootstrapping parameters use their own and independent cryptographic parameters (i.e. float.Parameters)
 //     and it is the user's responsibility to ensure that these parameters meet the target security and tweak them if necessary.
 func (p Parameters) GenEvaluationKeys(skN1 *rlwe.SecretKey) (btpkeys *EvaluationKeys, skN2 *rlwe.SecretKey, err error) {
-
-	var EvkN1ToN2, EvkN2ToN1 *rlwe.EvaluationKey
-	var EvkRealToCmplx *rlwe.EvaluationKey
-	var EvkCmplxToReal *rlwe.EvaluationKey
-	paramsN2 := p.BootstrappingParameters
-
-	kgen := rlwe.NewKeyGenerator(paramsN2)
-
-	if p.ResidualParameters.N() != paramsN2.N() {
-		// If the ring degree do not match
-		// (if the residual parameters are Conjugate Invariant, N1 = N2/2)
-		skN2 = kgen.GenSecretKeyNew()
-
-		if p.ResidualParameters.RingType() == ring.ConjugateInvariant {
-			EvkCmplxToReal, EvkRealToCmplx = kgen.GenEvaluationKeysForRingSwapNew(skN2, skN1)
-		} else {
-			EvkN1ToN2 = kgen.GenEvaluationKeyNew(skN1, skN2)
-			EvkN2ToN1 = kgen.GenEvaluationKeyNew(skN2, skN1)
+	btpkeys = &EvaluationKeys{MemEvaluationKeySet: rlwe.NewMemEvaluationKeySet(nil)}
+	skN2, err = p.genEvaluationKeysSequential(skN1, func(slot int, key io.WriterTo) error {
+		if key == nil {
+			return nil
 		}
+		switch slot {
+		case 0:
+			btpkeys.EvkN1ToN2 = key.(*rlwe.EvaluationKey)
+		case 1:
+			btpkeys.EvkN2ToN1 = key.(*rlwe.EvaluationKey)
+		case 2:
+			btpkeys.EvkRealToCmplx = key.(*rlwe.EvaluationKey)
+		case 3:
+			btpkeys.EvkCmplxToReal = key.(*rlwe.EvaluationKey)
+		case 4:
+			btpkeys.EvkDenseToSparse = key.(*rlwe.EvaluationKey)
+		case 5:
+			btpkeys.EvkSparseToDense = key.(*rlwe.EvaluationKey)
+		case 6:
+			btpkeys.RelinearizationKey = key.(*rlwe.RelinearizationKey)
+		case 7:
+			gk := key.(*rlwe.GaloisKey)
+			btpkeys.GaloisKeys[gk.GaloisElement] = gk
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return
+}
 
+// GenEvaluationKeysTo generates and writes the native v6 EvaluationKeys encoding
+// without retaining the complete key set. Each key is flushed before generating
+// the next; a write failure stops generation. The existing ring-swap primitive
+// is the only step that temporarily returns a pair of keys.
+func (p Parameters) GenEvaluationKeysTo(skN1 *rlwe.SecretKey, dst io.Writer) (n int64, err error) {
+	w := bufio.NewWriterSize(dst, 64*1024)
+	writeFlag := func(v uint8) error {
+		inc, e := buffer.WriteUint8(w, v)
+		n += inc
+		return e
+	}
+	_, err = p.genEvaluationKeysSequential(skN1, func(slot int, key io.WriterTo) error {
+		if slot < 6 {
+			if key == nil {
+				return writeFlag(0)
+			}
+			if e := writeFlag(1); e != nil {
+				return e
+			}
+		} else if slot == 6 {
+			// Boot MemEvaluationKeySet presence, followed by RLK presence.
+			if e := writeFlag(1); e != nil {
+				return e
+			}
+			if e := writeFlag(1); e != nil {
+				return e
+			}
+		} else {
+			inc, e := buffer.WriteUint64(w, key.(*rlwe.GaloisKey).GaloisElement)
+			n += inc
+			if e != nil {
+				return e
+			}
+		}
+		inc, e := key.WriteTo(w)
+		n += inc
+		if e != nil {
+			return e
+		}
+		if slot == 6 {
+			if e = writeFlag(1); e != nil {
+				return e
+			}
+			inc, e = buffer.WriteUint32(w, uint32(len(p.evaluationGaloisElements())))
+			n += inc
+			if e != nil {
+				return e
+			}
+		}
+		return w.Flush()
+	})
+	if err != nil {
+		return n, err
+	}
+	return n, w.Flush()
+}
+
+func (p Parameters) evaluationGaloisElements() []uint64 {
+	params := p.BootstrappingParameters
+	galEls := append(p.GaloisElements(params), params.GaloisElementForComplexConjugation())
+	slices.Sort(galEls)
+	return slices.Compact(galEls)
+}
+
+// slot follows EvaluationKeys.WriteTo: six optional switching keys, RLK, GLKs.
+// The visitor borrows the key only for the duration of the call unless it is the
+// bulk collector above. Temporary secrets remain alive for all linked keys.
+func (p Parameters) genEvaluationKeysSequential(skN1 *rlwe.SecretKey, visit func(int, io.WriterTo) error) (skN2 *rlwe.SecretKey, err error) {
+	paramsN2 := p.BootstrappingParameters
+	kgen := rlwe.NewKeyGenerator(paramsN2)
+	if p.ResidualParameters.N() != paramsN2.N() {
+		skN2 = kgen.GenSecretKeyNew()
 	} else {
-
-		ringQ := paramsN2.RingQ()
-		ringP := paramsN2.RingP()
-
-		// Else, keeps the same secret, but extends to the full modulus of the bootstrapping parameters.
+		ringQ, ringP := paramsN2.RingQ(), paramsN2.RingP()
 		skN2 = rlwe.NewSecretKey(paramsN2)
 		buff := ringQ.NewPoly()
-
-		// Extends basis Q0 -> QL
 		rlwe.ExtendBasisSmallNormAndCenterNTTMontgomery(ringQ, ringQ, skN1.Value.Q, buff, skN2.Value.Q)
-
-		// Extends basis Q0 -> P
 		rlwe.ExtendBasisSmallNormAndCenterNTTMontgomery(ringQ, ringP, skN1.Value.Q, buff, skN2.Value.P)
 	}
 
-	EvkDenseToSparse, EvkSparseToDense := p.genEncapsulationEvaluationKeysNew(skN2)
-
-	rlk := kgen.GenRelinearizationKeyNew(skN2)
-	gks := kgen.GenGaloisKeysNew(append(p.GaloisElements(paramsN2), paramsN2.GaloisElementForComplexConjugation()), skN2)
-
-	return &EvaluationKeys{
-		EvkN1ToN2:           EvkN1ToN2,
-		EvkN2ToN1:           EvkN2ToN1,
-		EvkRealToCmplx:      EvkRealToCmplx,
-		EvkCmplxToReal:      EvkCmplxToReal,
-		MemEvaluationKeySet: rlwe.NewMemEvaluationKeySet(rlk, gks...),
-		EvkDenseToSparse:    EvkDenseToSparse,
-		EvkSparseToDense:    EvkSparseToDense,
-	}, skN2, nil
-}
-
-// GenEncapsulationEvaluationKeysNew generates the low level encapsulation EvaluationKeys for the bootstrapping.
-func (p Parameters) genEncapsulationEvaluationKeysNew(skDense *rlwe.SecretKey) (EvkDenseToSparse, EvkSparseToDense *rlwe.EvaluationKey) {
-
-	params := p.BootstrappingParameters
+	switchKey := func(slot int, key *rlwe.EvaluationKey) error {
+		if key == nil {
+			return visit(slot, nil)
+		}
+		return visit(slot, key)
+	}
+	crossN := p.ResidualParameters.N() != paramsN2.N()
+	ci := p.ResidualParameters.RingType() == ring.ConjugateInvariant
+	for slot := 0; slot < 2; slot++ {
+		var key *rlwe.EvaluationKey
+		if crossN && !ci {
+			if slot == 0 {
+				key = kgen.GenEvaluationKeyNew(skN1, skN2)
+			} else {
+				key = kgen.GenEvaluationKeyNew(skN2, skN1)
+			}
+		}
+		if err = switchKey(slot, key); err != nil {
+			return nil, err
+		}
+	}
+	var realToCmplx, cmplxToReal *rlwe.EvaluationKey
+	if crossN && ci {
+		cmplxToReal, realToCmplx = kgen.GenEvaluationKeysForRingSwapNew(skN2, skN1)
+	}
+	if err = switchKey(2, realToCmplx); err != nil {
+		return nil, err
+	}
+	realToCmplx = nil
+	if err = switchKey(3, cmplxToReal); err != nil {
+		return nil, err
+	}
+	cmplxToReal = nil
 
 	if p.EphemeralSecretWeight == 0 {
-		return
+		for slot := 4; slot < 6; slot++ {
+			if err = switchKey(slot, nil); err != nil {
+				return nil, err
+			}
+		}
+	} else {
+		paramsSparse, e := rlwe.NewParametersFromLiteral(rlwe.ParametersLiteral{
+			LogN: paramsN2.LogN(), Q: paramsN2.Q()[:1], P: paramsN2.P(),
+		})
+		if e != nil {
+			return nil, e
+		}
+		kgenSparse := rlwe.NewKeyGenerator(paramsSparse)
+		skSparse := kgenSparse.GenSecretKeyWithHammingWeightNew(p.EphemeralSecretWeight)
+		if err = switchKey(4, kgenSparse.GenEvaluationKeyNew(skN2, skSparse)); err != nil {
+			return nil, err
+		}
+		if err = switchKey(5, kgen.GenEvaluationKeyNew(skSparse, skN2)); err != nil {
+			return nil, err
+		}
 	}
-
-	paramsSparse, _ := rlwe.NewParametersFromLiteral(rlwe.ParametersLiteral{
-		LogN: params.LogN(),
-		Q:    params.Q()[:1],
-		P:    params.P(), // @company CipherFlow
-	})
-
-	kgenSparse := rlwe.NewKeyGenerator(paramsSparse)
-	kgenDense := rlwe.NewKeyGenerator(params)
-	skSparse := kgenSparse.GenSecretKeyWithHammingWeightNew(p.EphemeralSecretWeight)
-
-	EvkDenseToSparse = kgenSparse.GenEvaluationKeyNew(skDense, skSparse)
-	EvkSparseToDense = kgenDense.GenEvaluationKeyNew(skSparse, skDense)
-	return
+	if err = visit(6, kgen.GenRelinearizationKeyNew(skN2)); err != nil {
+		return nil, err
+	}
+	for _, galEl := range p.evaluationGaloisElements() {
+		if err = visit(7, kgen.GenGaloisKeyNew(galEl, skN2)); err != nil {
+			return nil, err
+		}
+	}
+	return skN2, nil
 }
 
 // BinarySize returns the total binary size of the bootstrapper's keys.

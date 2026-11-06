@@ -9,6 +9,20 @@ import (
 // WriteAsUint64 casts &T to an *uint64 and writes it to w.
 // User must ensure that T can be stored in an uint64.
 func WriteAsUint64[T any](w Writer, c T) (n int64, err error) {
+	// Native-sized integers still have a uint64 wire representation on wasm32.
+	// Reading eight bytes through an *int there would read past the value.
+	switch v := any(c).(type) {
+	case int:
+		if v < 0 {
+			return 0, fmt.Errorf("negative int cannot be encoded as uint64")
+		}
+		return WriteUint64(w, uint64(v))
+	case uint:
+		return WriteUint64(w, uint64(v))
+	}
+	if unsafe.Sizeof(c) < 8 {
+		return 0, fmt.Errorf("cannot cast %T to uint64: value is smaller than 8 bytes", c)
+	}
 	/* #nosec G103 -- behavior and consequences well understood, pointer type cast */
 	return WriteUint64(w, *(*uint64)(unsafe.Pointer(&c)))
 }

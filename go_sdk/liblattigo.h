@@ -88,6 +88,20 @@ typedef struct ErrorStatus {
 
 #line 1 "cgo-generated-wrapper"
 
+#line 3 "client_context.go"
+
+#include <stdint.h>
+#include <stdlib.h>
+#ifndef GO_SDK_ERROR_STATUS_DEFINED
+#define GO_SDK_ERROR_STATUS_DEFINED
+typedef struct ErrorStatus {
+    int code;
+    char* message;
+} ErrorStatus;
+#endif
+
+#line 1 "cgo-generated-wrapper"
+
 #line 3 "c_struct_import_export.go"
 
 #include <stdint.h>
@@ -306,6 +320,10 @@ extern ErrorStatus SetCkksBootstrappingEvaluationKeySparseToDense(GoUint64 boots
 extern ErrorStatus CreateCkksBtpEvaluator(GoUint64 parameterHandle, GoUint64 bootstrappingEvaluationKeysHandle, uint64_t* evaluatorHandle);
 extern ErrorStatus CkksBootstrap(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, uint64_t* opOutCiphertextHandle);
 extern ErrorStatus CkksBootstrapMany(GoUint64 evaluatorHandle, uint64_t* op0CiphertextHandles, GoInt op0Count, uint64_t* opOutCiphertextHandles);
+extern ErrorStatus RestoreCkksClientKeys(GoUint64 parameterHandle, GoUint8 enableBootstrapping, GoUint8* data, uint64_t length, uint64_t* secretKeyHandle, uint64_t* publicKeyHandle);
+extern ErrorStatus GenCkksClientKeys(GoUint64 parameterHandle, GoUint8 enableBootstrapping, uint64_t* secretKeyHandle, uint64_t* publicKeyHandle);
+extern ErrorStatus WriteCkksEvaluationContextFile(GoUint64 parameterHandle, GoUint64 secretKeyHandle, GoUint64 publicKeyHandle, GoUint8 defaultRotations, GoUint8 enableBootstrapping, char* path);
+extern ErrorStatus WriteCkksFullContextFile(GoUint64 parameterHandle, GoUint64 secretKeyHandle, GoUint64 publicKeyHandle, GoUint8 defaultRotations, GoUint8 enableBootstrapping, char* path);
 extern ErrorStatus ImportCiphertext(GoUint64 parameterHandle, GoUint64 destHandle, Metadata* sourceMetadata, Metadata* targetMetadata, CCiphertext* cCiphertext);
 extern void ExportPlaintext(GoUint64 parameterHandle, GoUint64 plaintextHandle, Metadata* metadata, CPlaintext* plaintext);
 extern void ExportCiphertext(GoUint64 parameterHandle, GoUint64 ciphertextHandle, Metadata* metadata, CCiphertext* ciphertext);
