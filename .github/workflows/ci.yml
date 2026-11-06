@@ -54,7 +54,7 @@ jobs:
             ${{ runner.os }}-go-${{ matrix.go }}-build-
 
       - name: Build
-        run: go build ./...
+        run: go build $(go list ./... | grep -v /go_sdk)
 
       - name: Run Makefile tests
         run: make test

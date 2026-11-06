@@ -1,24 +1,29 @@
 .DEFAULT_GOAL := test
 
+# The go_sdk package depends on the parent lattisense repo's abi/ directory, so it
+# cannot be built as part of a standalone `./...` build; exclude it from the
+# compile-based targets.
+PKGS := $(shell go list ./... | grep -v '/go_sdk')
+
 .PHONY: test_gotest
 test_gotest:
 	go clean -testcache
-	go test -timeout=0 ./...
+	go test -timeout=0 $(PKGS)
 
 .PHONY: checks
 checks: check_tools
 	@echo Checking correct formatting of files
 	
 	@FMTOUT=$$(go fmt ./...); \
-	if [ -z $$FMTOUT ]; then\
+	if [ -z "$$FMTOUT" ]; then\
         echo "go fmt: OK";\
 	else \
 		echo "go fmt: problems in files:";\
-		echo $$FMTOUT;\
+		echo "$$FMTOUT";\
 		false;\
     fi
 
-	@if GOVETOUT=$$(go vet ./... 2>&1); then\
+	@if GOVETOUT=$$(go vet $(PKGS) 2>&1); then\
         echo "go vet: OK";\
 	else \
 		echo "go vet: problems in files:";\
@@ -35,7 +40,7 @@ checks: check_tools
 		false;\
     fi
 	
-	@STATICCHECKOUT=$$(staticcheck -go 1.24 -checks all ./...); \
+	@STATICCHECKOUT=$$(staticcheck -go 1.24 -checks all $(PKGS)); \
 	if [ -z "$$STATICCHECKOUT" ]; then\
         echo "staticcheck: OK";\
 	else \
@@ -44,7 +49,7 @@ checks: check_tools
 		false;\
     fi
 
-	@GOVULNCHECKOUT=$$(govulncheck ./...); \
+	@GOVULNCHECKOUT=$$(govulncheck $(PKGS)); \
 	if echo "$$GOVULNCHECKOUT" | grep -q "No vulnerabilities found"; then\
 		echo "govulncheck: OK";\
     else \
@@ -53,7 +58,7 @@ checks: check_tools
 		false;\
 	fi
 
-	@GOSECOUT=$$(gosec -quiet -exclude=G602 ./...); \
+	@GOSECOUT=$$(gosec -quiet -exclude=G602 $(PKGS)); \
 	if [ -z "$$GOSECOUT" ]; then\
 		echo "gosec: OK";\
 	else \
