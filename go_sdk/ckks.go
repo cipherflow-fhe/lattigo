@@ -20,9 +20,7 @@ import (
 	"strconv"
 	"unsafe"
 
-	"github.com/cipherflow-fhe/lattigo/circuits/ckks/bootstrapping"
 	"github.com/cipherflow-fhe/lattigo/core/rlwe"
-	"github.com/cipherflow-fhe/lattigo/examples"
 	"github.com/cipherflow-fhe/lattigo/ring"
 	"github.com/cipherflow-fhe/lattigo/schemes/ckks"
 )
@@ -41,63 +39,6 @@ func ringTypeFromInt(v int) (ring.Type, error) {
 	default:
 		return ring.Standard, fmt.Errorf("unsupported ring type %d", v)
 	}
-}
-
-// ckksResidualPrimeCount is the number of ciphertext primes kept by the residual
-// parameter sets whose modulus leaves room for the bootstrapping circuit. A set
-// not listed here keeps all of its primes.
-var ckksResidualPrimeCount = map[int]int{
-	15: 13,
-	16: 12,
-}
-
-//export CreateCkksDefaultParameter
-func CreateCkksDefaultParameter(logN int, ringType int, parameterHandle *C.uint64_t) (status C.ErrorStatus) {
-	status = okStatus()
-	defer recoverStatus(&status)
-
-	ringTypeValue, err := ringTypeFromInt(ringType)
-	if err != nil {
-		return errorStatus(err)
-	}
-
-	var literal ckks.ParametersLiteral
-	switch logN {
-	case 12:
-		literal = examples.CKKSComplexParamsN12QP109
-	case 13:
-		literal = examples.CKKSComplexParamsN13QP218
-	case 14:
-		literal = examples.CKKSComplexParamsN14QP438
-	case 15:
-		literal = examples.CKKSComplexParamsN15QP881
-	case 16:
-		literal = examples.CKKSComplexParamsPN16QP1761
-	default:
-		return errorStatus(fmt.Errorf("LogN not supported"))
-	}
-	// The moduli must be 1 modulo 2N of every ring they are used with, and 4N for
-	// the conjugate invariant ring, so that the same chain serves both and can be
-	// reused by the bootstrapping circuit. Keep the generated values consistent
-	// with frontend/parameter.json, which is materialized the same way.
-	literal.LogNthRoot = max(logN+2, bootstrapping.DefaultLogN+1)
-	literal.RingType = ringTypeValue
-
-	// Some residual sets keep only part of their ciphertext primes, leaving room in
-	// the modulus budget of the ring the bootstrapping circuit runs in.
-	if n, ok := ckksResidualPrimeCount[logN]; ok {
-		if n > len(literal.LogQ) {
-			return errorStatus(fmt.Errorf("LogN=%d has only %d ciphertext primes", logN, len(literal.LogQ)))
-		}
-		literal.LogQ = literal.LogQ[:n]
-	}
-
-	params, err := ckks.NewParametersFromLiteral(literal)
-	if err != nil {
-		return errorStatus(err)
-	}
-	*parameterHandle = C.uint64_t(insertObject(&params))
-	return status
 }
 
 //export CreateCkksCustomParameter
@@ -702,7 +643,7 @@ func getGLKCol(step int32, logSlots int) (glkColPosIdx []int, glkColNegIdx []int
 }
 
 //export CkksRotate
-func CkksRotate(evaluatorHandle uint64, op0CiphertextHandle uint64, steps *C.int32_t, length int, useDefaultRotationKeys C.uint8_t, opOutCiphertextHandles *C.uint64_t) (status C.ErrorStatus) {
+func CkksRotate(evaluatorHandle uint64, op0CiphertextHandle uint64, steps *C.int32_t, length int, useNafDecomposedRotationKeys C.uint8_t, opOutCiphertextHandles *C.uint64_t) (status C.ErrorStatus) {
 	status = okStatus()
 	defer recoverStatus(&status)
 
@@ -721,7 +662,7 @@ func CkksRotate(evaluatorHandle uint64, op0CiphertextHandle uint64, steps *C.int
 	rotationSteps := unsafe.Slice((*int32)(steps), length)
 	opOutHandles := unsafe.Slice((*uint64)(opOutCiphertextHandles), length)
 
-	if useDefaultRotationKeys == 0 {
+	if useNafDecomposedRotationKeys == 0 {
 		rotations := make([]int, length)
 		for i, step := range rotationSteps {
 			rotations[i] = int(step)

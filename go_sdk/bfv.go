@@ -20,39 +20,10 @@ import (
 	"unsafe"
 
 	"github.com/cipherflow-fhe/lattigo/core/rlwe"
-	"github.com/cipherflow-fhe/lattigo/examples"
 	"github.com/cipherflow-fhe/lattigo/schemes/bgv"
 )
 
 // ─── BfvParameter ────────────────────────────────────────────────────────────
-
-//export CreateBfvDefaultParameter
-func CreateBfvDefaultParameter(logN int, T uint64, parameterHandle *C.uint64_t) (status C.ErrorStatus) {
-	status = okStatus()
-	defer recoverStatus(&status)
-
-	var literal bgv.ParametersLiteral
-	switch logN {
-	case 12:
-		literal = examples.BGVScaleInvariantParamsN12QP109
-	case 13:
-		literal = examples.BGVScaleInvariantParamsN13QP218
-	case 14:
-		literal = examples.BGVScaleInvariantParamsN14QP438
-	case 15:
-		literal = examples.BGVScaleInvariantParamsN15QP880
-	default:
-		return errorStatus(fmt.Errorf("LogN not supported"))
-	}
-	literal.PlaintextModulus = T
-
-	params, err := bgv.NewParametersFromLiteral(literal)
-	if err != nil {
-		return errorStatus(err)
-	}
-	*parameterHandle = C.uint64_t(insertObject(&params))
-	return status
-}
 
 //export CreateBfvCustomParameter
 func CreateBfvCustomParameter(logN int, T uint64, q *C.uint64_t, qLen int, p *C.uint64_t, pLen int, parameterHandle *C.uint64_t) (status C.ErrorStatus) {
@@ -631,7 +602,7 @@ func BfvRescale(evaluatorHandle uint64, op0CiphertextHandle uint64, opOutCiphert
 }
 
 //export BfvRotateColumns
-func BfvRotateColumns(evaluatorHandle uint64, op0CiphertextHandle uint64, steps *C.int32_t, length int, useDefaultRotationKeys C.uint8_t, opOutCiphertextHandles *C.uint64_t) (status C.ErrorStatus) {
+func BfvRotateColumns(evaluatorHandle uint64, op0CiphertextHandle uint64, steps *C.int32_t, length int, useNafDecomposedRotationKeys C.uint8_t, opOutCiphertextHandles *C.uint64_t) (status C.ErrorStatus) {
 	status = okStatus()
 	defer recoverStatus(&status)
 
@@ -650,7 +621,7 @@ func BfvRotateColumns(evaluatorHandle uint64, op0CiphertextHandle uint64, steps 
 	rotationSteps := unsafe.Slice((*int32)(steps), length)
 	opOutHandles := unsafe.Slice((*uint64)(opOutCiphertextHandles), length)
 
-	if useDefaultRotationKeys == 0 {
+	if useNafDecomposedRotationKeys == 0 {
 		rotations := make([]int, length)
 		for i, step := range rotationSteps {
 			rotations[i] = int(step)

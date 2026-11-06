@@ -50,10 +50,9 @@ func GetCkksBootstrappingParameterFromBtpParameter(parameterHandle uint64, boots
 }
 
 // btpParamsByResidualLogN is the bootstrapping circuit shape, indexed by the
-// residual ring degree. The circuit always runs in the standard ring of degree
-// 16, which for a residual of log_n 16 is the residual ring itself and otherwise
-// is one or two degrees above it. Only a residual degree listed here can be
-// bootstrapped.
+// residual ring degree. The circuit runs at degree 16 for both ring types; a
+// conjugate invariant residual bootstraps natively in the CI ring (full packing,
+// no domain switch). Only a residual degree listed here can be bootstrapped.
 var btpParamsByResidualLogN = map[int]bootstrapping.ParametersLiteral{
 	14: {
 		LogN: utils.Pointy(16),
@@ -88,19 +87,21 @@ func CreateCkksBtpParameterFromResidualParameter(residualParameterHandle uint64,
 	}
 	bootLogN := btpParametersLit.GetLogN()
 
-	if params.RingType() == ring.ConjugateInvariant && bootLogN != params.LogN()+1 {
-		// The conjugate invariant ring is only compatible with a circuit degree of
-		// exactly residual LogN + 1, so that both rings share the same primitive
-		// root order m = 4 * n_ci.
-		return errorStatus(fmt.Errorf("cannot CreateCkksBtpParameterFromResidualParameter: bootstrapping LogN must be residual LogN + 1 for the conjugate invariant ring, got %d", bootLogN))
-	}
+	// A conjugate invariant residual bootstraps natively in the CI ring via the
+	// real DFT (full packing), so no domain switch keys are involved.
+	ci := params.RingType() == ring.ConjugateInvariant
+	btpParametersLit.NativeCI = ci
 
 	btpParams, err := bootstrapping.NewParametersFromLiteral(*params, btpParametersLit)
 	if err != nil {
 		return errorStatus(err)
 	}
-	btpParams.SlotsToCoeffsParameters.LogSlots = bootLogN - 1
-	btpParams.CoeffsToSlotsParameters.LogSlots = bootLogN - 1
+	logSlots := bootLogN - 1
+	if ci {
+		logSlots = bootLogN
+	}
+	btpParams.SlotsToCoeffsParameters.LogSlots = logSlots
+	btpParams.CoeffsToSlotsParameters.LogSlots = logSlots
 	// The circuit ring is larger than the residual ring, which shifts the message
 	// ratio of the modular reduction by the degree difference.
 	btpParams.Mod1ParametersLiteral.LogMessageRatio += bootLogN - params.LogN()
@@ -110,7 +111,7 @@ func CreateCkksBtpParameterFromResidualParameter(residualParameterHandle uint64,
 }
 
 //export GenCkksBootstrappingEvaluationKeys
-func GenCkksBootstrappingEvaluationKeys(parameterHandle uint64, secretKeyHandle uint64, bootstrappingEvaluationKeysHandle *C.uint64_t, evkN1ToN2Handle *C.uint64_t, evkN2ToN1Handle *C.uint64_t, evkCmplxToRealHandle *C.uint64_t, evkRealToCmplxHandle *C.uint64_t, evkDenseToSparseHandle *C.uint64_t, evkSparseToDenseHandle *C.uint64_t, evaluationKeySetHandle *C.uint64_t) (status C.ErrorStatus) {
+func GenCkksBootstrappingEvaluationKeys(parameterHandle uint64, secretKeyHandle uint64, bootstrappingEvaluationKeysHandle *C.uint64_t, evkN1ToN2Handle *C.uint64_t, evkN2ToN1Handle *C.uint64_t, evkDenseToSparseHandle *C.uint64_t, evkSparseToDenseHandle *C.uint64_t, evaluationKeySetHandle *C.uint64_t) (status C.ErrorStatus) {
 	status = okStatus()
 	defer recoverStatus(&status)
 
@@ -127,13 +128,6 @@ func GenCkksBootstrappingEvaluationKeys(parameterHandle uint64, secretKeyHandle 
 	if keys.EvkN2ToN1 != nil {
 		*evkN2ToN1Handle = C.uint64_t(insertObject(keys.EvkN2ToN1))
 	}
-	
-	if keys.EvkCmplxToReal != nil {
-		*evkCmplxToRealHandle = C.uint64_t(insertObject(keys.EvkCmplxToReal))
-	}
-	if keys.EvkRealToCmplx != nil {
-		*evkRealToCmplxHandle = C.uint64_t(insertObject(keys.EvkRealToCmplx))
-	}
 	if keys.EvkDenseToSparse != nil {
 		*evkDenseToSparseHandle = C.uint64_t(insertObject(keys.EvkDenseToSparse))
 	}
@@ -148,7 +142,7 @@ func GenCkksBootstrappingEvaluationKeys(parameterHandle uint64, secretKeyHandle 
 }
 
 //export CreateCkksBootstrappingEvaluationKeys
-func CreateCkksBootstrappingEvaluationKeys(evkN1ToN2Handle uint64, evkN2ToN1Handle uint64, evkCmplxToRealHandle uint64, evkRealToCmplxHandle uint64, evkDenseToSparseHandle uint64, evkSparseToDenseHandle uint64, evaluationKeySetHandle uint64, bootstrappingEvaluationKeysHandle *C.uint64_t) (status C.ErrorStatus) {
+func CreateCkksBootstrappingEvaluationKeys(evkN1ToN2Handle uint64, evkN2ToN1Handle uint64, evkDenseToSparseHandle uint64, evkSparseToDenseHandle uint64, evaluationKeySetHandle uint64, bootstrappingEvaluationKeysHandle *C.uint64_t) (status C.ErrorStatus) {
 	status = okStatus()
 	defer recoverStatus(&status)
 
@@ -158,12 +152,6 @@ func CreateCkksBootstrappingEvaluationKeys(evkN1ToN2Handle uint64, evkN2ToN1Hand
 	}
 	if evkN2ToN1Handle != 0 {
 		keys.EvkN2ToN1 = getObject[rlwe.EvaluationKey](evkN2ToN1Handle)
-	}
-	if evkCmplxToRealHandle != 0 {
-		keys.EvkCmplxToReal = getObject[rlwe.EvaluationKey](evkCmplxToRealHandle)
-	}
-	if evkRealToCmplxHandle != 0 {
-		keys.EvkRealToCmplx = getObject[rlwe.EvaluationKey](evkRealToCmplxHandle)
 	}
 	if evkDenseToSparseHandle != 0 {
 		keys.EvkDenseToSparse = getObject[rlwe.EvaluationKey](evkDenseToSparseHandle)
@@ -179,15 +167,13 @@ func CreateCkksBootstrappingEvaluationKeys(evkN1ToN2Handle uint64, evkN2ToN1Hand
 }
 
 //export GetCkksBootstrappingEvaluationKeys
-func GetCkksBootstrappingEvaluationKeys(bootstrappingEvaluationKeysHandle uint64, evkN1ToN2Handle *C.uint64_t, evkN2ToN1Handle *C.uint64_t, evkCmplxToRealHandle *C.uint64_t, evkRealToCmplxHandle *C.uint64_t, evkDenseToSparseHandle *C.uint64_t, evkSparseToDenseHandle *C.uint64_t, evaluationKeySetHandle *C.uint64_t) (status C.ErrorStatus) {
+func GetCkksBootstrappingEvaluationKeys(bootstrappingEvaluationKeysHandle uint64, evkN1ToN2Handle *C.uint64_t, evkN2ToN1Handle *C.uint64_t, evkDenseToSparseHandle *C.uint64_t, evkSparseToDenseHandle *C.uint64_t, evaluationKeySetHandle *C.uint64_t) (status C.ErrorStatus) {
 	status = okStatus()
 	defer recoverStatus(&status)
 
 	keys := getObject[bootstrapping.EvaluationKeys](bootstrappingEvaluationKeysHandle)
 	*evkN1ToN2Handle = 0
 	*evkN2ToN1Handle = 0
-	*evkCmplxToRealHandle = 0
-	*evkRealToCmplxHandle = 0
 	*evkDenseToSparseHandle = 0
 	*evkSparseToDenseHandle = 0
 	*evaluationKeySetHandle = 0
@@ -196,13 +182,6 @@ func GetCkksBootstrappingEvaluationKeys(bootstrappingEvaluationKeysHandle uint64
 	}
 	if keys.EvkN2ToN1 != nil {
 		*evkN2ToN1Handle = C.uint64_t(insertObject(keys.EvkN2ToN1))
-	}
-	
-	if keys.EvkCmplxToReal != nil {
-		*evkCmplxToRealHandle = C.uint64_t(insertObject(keys.EvkCmplxToReal))
-	}
-	if keys.EvkRealToCmplx != nil {
-		*evkRealToCmplxHandle = C.uint64_t(insertObject(keys.EvkRealToCmplx))
 	}
 	if keys.EvkDenseToSparse != nil {
 		*evkDenseToSparseHandle = C.uint64_t(insertObject(keys.EvkDenseToSparse))
@@ -290,28 +269,6 @@ func SetCkksBootstrappingEvaluationKeyN2ToN1(bootstrappingEvaluationKeysHandle u
 	keys := getObject[bootstrapping.EvaluationKeys](bootstrappingEvaluationKeysHandle)
 	evaluationKey := getObject[rlwe.EvaluationKey](evaluationKeyHandle)
 	keys.EvkN2ToN1 = evaluationKey
-	return status
-}
-
-//export SetCkksBootstrappingEvaluationKeyCmplxToReal
-func SetCkksBootstrappingEvaluationKeyCmplxToReal(bootstrappingEvaluationKeysHandle uint64, evaluationKeyHandle uint64) (status C.ErrorStatus) {
-	status = okStatus()
-	defer recoverStatus(&status)
-
-	keys := getObject[bootstrapping.EvaluationKeys](bootstrappingEvaluationKeysHandle)
-	evaluationKey := getObject[rlwe.EvaluationKey](evaluationKeyHandle)
-	keys.EvkCmplxToReal = evaluationKey
-	return status
-}
-
-//export SetCkksBootstrappingEvaluationKeyRealToCmplx
-func SetCkksBootstrappingEvaluationKeyRealToCmplx(bootstrappingEvaluationKeysHandle uint64, evaluationKeyHandle uint64) (status C.ErrorStatus) {
-	status = okStatus()
-	defer recoverStatus(&status)
-
-	keys := getObject[bootstrapping.EvaluationKeys](bootstrappingEvaluationKeysHandle)
-	evaluationKey := getObject[rlwe.EvaluationKey](evaluationKeyHandle)
-	keys.EvkRealToCmplx = evaluationKey
 	return status
 }
 

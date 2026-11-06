@@ -100,9 +100,13 @@ func (d MatrixLiteral) Depth(actual bool) (depth int) {
 // GaloisElements returns the list of Galois elements required to evaluate the transform.
 func (d MatrixLiteral) GaloisElements(params ckks.Parameters) (galEls []uint64) {
 	diags := d.genDiagonals()
+	identity := params.GaloisElement(0) // the identity rotation needs no key
 	seen := make(map[uint64]bool)
 	for _, vec := range diags {
 		for _, ge := range lintrans.GaloisElements(params, vec.DiagonalsIndexList(), 1<<d.LogSlots, d.LogBSGSRatio) {
+			if ge == identity {
+				continue
+			}
 			if !seen[ge] {
 				seen[ge] = true
 				galEls = append(galEls, ge)
