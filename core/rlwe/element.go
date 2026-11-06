@@ -6,12 +6,12 @@ import (
 	"io"
 	"math/bits"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/cipherflow-fhe/lattigo/ring"
 	"github.com/cipherflow-fhe/lattigo/ring/ringqp"
 	"github.com/cipherflow-fhe/lattigo/utils/buffer"
 	"github.com/cipherflow-fhe/lattigo/utils/sampling"
 	"github.com/cipherflow-fhe/lattigo/utils/structs"
+	"github.com/google/go-cmp/cmp"
 )
 
 // ElementInterface is a common interface for [Ciphertext] and [Plaintext] types.

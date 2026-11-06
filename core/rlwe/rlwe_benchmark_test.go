@@ -5,8 +5,8 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"github.com/cipherflow-fhe/lattigo/utils"
+	"github.com/stretchr/testify/require"
 )
 
 func BenchmarkRLWE(b *testing.B) {

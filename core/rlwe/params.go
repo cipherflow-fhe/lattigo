@@ -10,11 +10,11 @@ import (
 	"math/bits"
 	"slices"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/cipherflow-fhe/lattigo/ring"
 	"github.com/cipherflow-fhe/lattigo/ring/ringqp"
 	"github.com/cipherflow-fhe/lattigo/utils"
 	"github.com/cipherflow-fhe/lattigo/utils/buffer"
+	"github.com/google/go-cmp/cmp"
 )
 
 // MaxLogN is the log2 of the largest supported polynomial modulus degree.

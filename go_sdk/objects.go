@@ -23,4 +23,3 @@ func getObjectAs[T any](handleID uint64) T {
 func ReleaseHandle(handleID uint64) {
 	cgo.Handle(handleID).Delete()
 }
-

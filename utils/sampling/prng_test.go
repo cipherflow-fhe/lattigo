@@ -3,8 +3,8 @@ package sampling_test
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"github.com/cipherflow-fhe/lattigo/utils/sampling"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_PRNG(t *testing.T) {

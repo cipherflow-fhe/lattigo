@@ -7,11 +7,11 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"github.com/cipherflow-fhe/lattigo/core/rlwe"
 	"github.com/cipherflow-fhe/lattigo/ring"
 	"github.com/cipherflow-fhe/lattigo/utils"
 	"github.com/cipherflow-fhe/lattigo/utils/bignum"
+	"github.com/stretchr/testify/require"
 )
 
 // PrecisionStats is a struct storing statistic about the precision of a CKKS plaintext

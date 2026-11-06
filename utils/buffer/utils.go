@@ -9,9 +9,9 @@ import (
 	"testing"
 	"unsafe"
 
+	"github.com/cipherflow-fhe/lattigo/utils"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
-	"github.com/cipherflow-fhe/lattigo/utils"
 )
 
 // binarySerializer is a testing interface for byte encoding and decoding.

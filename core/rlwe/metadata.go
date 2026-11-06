@@ -6,9 +6,9 @@ import (
 	"io"
 	"math/big"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/cipherflow-fhe/lattigo/ring"
 	"github.com/cipherflow-fhe/lattigo/utils/bignum"
+	"github.com/google/go-cmp/cmp"
 )
 
 // MetaData is a struct storing metadata.

@@ -4,8 +4,8 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"github.com/cipherflow-fhe/lattigo/utils/factorization"
+	"github.com/stretchr/testify/require"
 )
 
 const (

@@ -6,10 +6,10 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"github.com/cipherflow-fhe/lattigo/core/rlwe"
 	"github.com/cipherflow-fhe/lattigo/ring"
 	"github.com/cipherflow-fhe/lattigo/utils"
+	"github.com/stretchr/testify/require"
 )
 
 func testString(params rlwe.Parameters, opname string) string {

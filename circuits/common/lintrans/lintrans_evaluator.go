@@ -128,7 +128,7 @@ func (eval Evaluator) PreRotatedCiphertextForDiagonalMatrixMultiplication(
 // result as a normalized ciphertext modulo Q. Each substep must be a signed power of two for which a
 // Galois key exists. If ctInDecompQP is not nil, it must be the RNS decomposition of ctIn and is reused
 // for the first substep (it is never modified).
-// @company CipherFlow. 
+// @company CipherFlow.
 func (eval Evaluator) rotateBySubsteps(levelQ, levelP int, ctIn *rlwe.Ciphertext, ctInDecompQP []ringqp.Poly, substeps []int, opOut *rlwe.Ciphertext) (err error) {
 
 	poolQP := eval.pool.AtLevel(levelQ, levelP)

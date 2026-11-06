@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"github.com/cipherflow-fhe/lattigo/utils/bignum"
+	"github.com/stretchr/testify/require"
 )
 
 func BenchmarkRing(b *testing.B) {

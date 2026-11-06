@@ -11,8 +11,8 @@ import (
 	"github.com/cipherflow-fhe/lattigo/utils/sampling"
 	"github.com/cipherflow-fhe/lattigo/utils/structs"
 
-	"github.com/stretchr/testify/require"
 	"github.com/cipherflow-fhe/lattigo/utils/bignum"
+	"github.com/stretchr/testify/require"
 )
 
 var T = uint64(0x3ee0001)

@@ -6,11 +6,11 @@ import (
 	"io"
 	"slices"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/cipherflow-fhe/lattigo/ring/ringqp"
 	"github.com/cipherflow-fhe/lattigo/utils/buffer"
 	"github.com/cipherflow-fhe/lattigo/utils/sampling"
 	"github.com/cipherflow-fhe/lattigo/utils/structs"
+	"github.com/google/go-cmp/cmp"
 )
 
 // SecretKey is a type for generic RLWE secret keys.

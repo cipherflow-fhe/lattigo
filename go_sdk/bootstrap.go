@@ -58,19 +58,19 @@ var btpParamsByResidualLogN = map[int]bootstrapping.ParametersLiteral{
 		LogN: utils.Pointy(16),
 		SlotsToCoeffsFactorizationDepthAndLogScales: [][]int{{39}, {39}, {39}},
 		CoeffsToSlotsFactorizationDepthAndLogScales: [][]int{{56}, {56}, {56}, {56}},
-		EvalModLogScale:                              utils.Pointy(60),
+		EvalModLogScale: utils.Pointy(60),
 	},
 	15: {
 		LogN: utils.Pointy(16),
 		SlotsToCoeffsFactorizationDepthAndLogScales: [][]int{{39}, {39}, {39}},
 		CoeffsToSlotsFactorizationDepthAndLogScales: [][]int{{56}, {56}, {56}, {56}},
-		EvalModLogScale:                              utils.Pointy(60),
+		EvalModLogScale: utils.Pointy(60),
 	},
 	16: {
 		LogN: utils.Pointy(16),
 		SlotsToCoeffsFactorizationDepthAndLogScales: [][]int{{39}, {39}, {39}},
 		CoeffsToSlotsFactorizationDepthAndLogScales: [][]int{{56}, {56}, {56}, {56}},
-		EvalModLogScale:                              utils.Pointy(60),
+		EvalModLogScale: utils.Pointy(60),
 	},
 }
 

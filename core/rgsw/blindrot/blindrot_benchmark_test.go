@@ -3,10 +3,10 @@ package blindrot
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"github.com/cipherflow-fhe/lattigo/core/rlwe"
 	"github.com/cipherflow-fhe/lattigo/utils"
 	"github.com/cipherflow-fhe/lattigo/utils/sampling"
+	"github.com/stretchr/testify/require"
 )
 
 func BenchmarkHEBin(b *testing.B) {

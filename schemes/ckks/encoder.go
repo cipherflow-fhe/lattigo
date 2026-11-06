@@ -981,7 +981,7 @@ func polyToComplexNoCRT(coeffs []uint64, values FloatSlice, scale rlwe.Scale, lo
 	maxCols := int(ringQ.NthRoot() >> 2)
 	gap := maxCols / slots
 	imagStart := maxCols // @company CipherFlow
-	if isRingT { // @company CipherFlow
+	if isRingT {         // @company CipherFlow
 		gap = 1
 		imagStart = slots
 	}
