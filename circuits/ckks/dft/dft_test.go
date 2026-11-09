@@ -450,3 +450,213 @@ var (
 
 	testParametersLiteral = []ckks.ParametersLiteral{testInsecurePrec45, testInsecurePrec90}
 )
+
+// TestHomomorphicRealDFT tests the homomorphic encoding and decoding of the real
+// DFT in the conjugate-invariant ring, following the CI-CKKS bootstrapping
+// circuit.
+//
+// Per the CI-CKKS bootstrapping paper (ePrint 2026/2618, Section 3.1), the real
+// DFT factorization computes P·V^{-1} (CoeffsToSlots) and V·P^T (SlotsToCoeffs),
+// where P is the permutation induced by the ordering of the final real
+// coordinates — it is explicitly *not* a bit-reversal. The permutation is not
+// evaluated separately: it is left in place and cancels between the two
+// transformations. Each direction is checked against the exact permuted
+// reference produced by realDFTCoordinatePermutation.
+// @company CipherFlow
+func TestHomomorphicRealDFT(t *testing.T) {
+	if runtime.GOARCH == "wasm" {
+		t.Skip("skipping homomorphic real DFT tests for GOARCH=wasm")
+	}
+
+	paramsLiteral := testInsecurePrec45
+	paramsLiteral.RingType = ring.ConjugateInvariant
+
+	params, err := ckks.NewParametersFromLiteral(paramsLiteral)
+	require.NoError(t, err)
+
+	testHomomorphicRealEncoding(params, t)
+	testHomomorphicRealDecoding(params, t)
+}
+
+// testHomomorphicRealEncoding checks CoeffsToSlots: a coefficient-encoded
+// ciphertext is transformed into the slot domain. Slot-decoding the result
+// yields the input vector permuted by the real-DFT slot permutation P.
+// @company CipherFlow
+func testHomomorphicRealEncoding(params ckks.Parameters, t *testing.T) {
+	logSlots := params.LogMaxDimensions().Cols // = logN for the CI ring
+	slots := 1 << logSlots
+
+	levels := make([]int, params.MaxDepth())
+	for i := range levels {
+		levels[i] = 1
+	}
+
+	ctsLit := MatrixLiteral{Type: HomomorphicEncode, LogSlots: logSlots, Real: true, LevelQ: params.MaxLevelQ(), LevelP: params.MaxLevelP(), Levels: levels}
+
+	kgen := rlwe.NewKeyGenerator(params)
+	sk := kgen.GenSecretKeyNew()
+	encoder := ckks.NewEncoder(params)
+	encryptor := rlwe.NewEncryptor(params, sk)
+	decryptor := rlwe.NewDecryptor(params, sk)
+
+	ctsMat, err := NewMatrixFromLiteral(params, ctsLit, encoder)
+	require.NoError(t, err)
+
+	galEls := ctsLit.GaloisElements(params)
+	evk := rlwe.NewMemEvaluationKeySet(nil, kgen.GenGaloisKeysNew(galEls, sk)...)
+	hdftEval := NewEvaluator(params, ckks.NewEvaluator(params, evk))
+
+	// Random real slot vector.
+	values := make([]float64, slots)
+	r := rand.New(rand.NewSource(0))
+	for i := range values {
+		values[i] = 2*r.Float64() - 1
+	}
+
+	// Encode coefficient-wise: the plaintext holds the slot values as raw
+	// polynomial coefficients (the output of the bootstrapping ModRaise).
+	pt := ckks.NewPlaintext(params, params.MaxLevel())
+	pt.LogDimensions = ring.Dimensions{Rows: 0, Cols: logSlots}
+	pt.IsBatched = false
+	require.NoError(t, encoder.Encode(values, pt))
+	pt.IsBatched = true
+	ct, err := encryptor.EncryptNew(pt)
+	require.NoError(t, err)
+
+	// CoeffsToSlots (coeffs -> slots).
+	ctSlots, _, err := hdftEval.CoeffsToSlotsNew(ct, ctsMat)
+	require.NoError(t, err)
+
+	// Slot-decode the result; it is the input permuted by the real-DFT slot
+	// permutation P.
+	ctSlots.IsBatched = true
+	ctSlots.LogDimensions = ring.Dimensions{Rows: 0, Cols: logSlots}
+	have := make([]float64, slots)
+	require.NoError(t, encoder.Decode(decryptor.DecryptNew(ctSlots), have))
+
+	want := permute(values, realDFTCoordinatePermutation(logSlots))
+	ckks.VerifyTestVectors(params, encoder, nil, want, have, params.LogDefaultScale(), 0, true, t)
+}
+
+// testHomomorphicRealDecoding checks SlotsToCoeffs: a slot-encoded ciphertext is
+// transformed into the coefficient domain. Coefficient-decoding the result
+// yields the input vector permuted by the inverse of the real-DFT slot
+// permutation P.
+// @company CipherFlow
+func testHomomorphicRealDecoding(params ckks.Parameters, t *testing.T) {
+	logSlots := params.LogMaxDimensions().Cols // = logN for the CI ring
+	slots := 1 << logSlots
+
+	levels := make([]int, params.MaxDepth())
+	for i := range levels {
+		levels[i] = 1
+	}
+
+	stcLit := MatrixLiteral{Type: HomomorphicDecode, LogSlots: logSlots, Real: true, LevelQ: params.MaxLevelQ(), LevelP: params.MaxLevelP(), Levels: levels}
+
+	kgen := rlwe.NewKeyGenerator(params)
+	sk := kgen.GenSecretKeyNew()
+	encoder := ckks.NewEncoder(params)
+	encryptor := rlwe.NewEncryptor(params, sk)
+	decryptor := rlwe.NewDecryptor(params, sk)
+
+	stcMat, err := NewMatrixFromLiteral(params, stcLit, encoder)
+	require.NoError(t, err)
+
+	galEls := stcLit.GaloisElements(params)
+	evk := rlwe.NewMemEvaluationKeySet(nil, kgen.GenGaloisKeysNew(galEls, sk)...)
+	hdftEval := NewEvaluator(params, ckks.NewEvaluator(params, evk))
+
+	// Random real slot vector.
+	values := make([]float64, slots)
+	r := rand.New(rand.NewSource(0))
+	for i := range values {
+		values[i] = 2*r.Float64() - 1
+	}
+
+	// Encode (slots -> coeffs) and encrypt.
+	pt := ckks.NewPlaintext(params, params.MaxLevel())
+	pt.LogDimensions = ring.Dimensions{Rows: 0, Cols: logSlots}
+	require.NoError(t, encoder.Encode(values, pt))
+	ct0, err := encryptor.EncryptNew(pt)
+	require.NoError(t, err)
+
+	// SlotsToCoeffs (slots -> coeffs).
+	res, err := hdftEval.SlotsToCoeffsNew(ct0, nil, stcMat)
+	require.NoError(t, err)
+
+	// Coefficient-decode the result; it is the input permuted by P^{-1}.
+	res.IsBatched = false
+	have := make([]float64, params.N())
+	require.NoError(t, encoder.Decode(decryptor.DecryptNew(res), have))
+
+	want := permute(values, invertPermutation(realDFTCoordinatePermutation(logSlots)))
+	ckks.VerifyTestVectors(params, encoder, nil, want, have, params.LogDefaultScale(), 0, true, t)
+}
+
+// realDFTCoordinatePermutation returns the permutation P determined by the ordering
+// of the final real coordinates of the real DFT (CI-CKKS bootstrapping paper,
+// ePrint 2026/2618, Theorem 1). P[i] is the slot index that lands at output
+// position i after CoeffsToSlots, so slot-decoding the CoeffsToSlots output
+// yields P(x) for an input slot vector x. It is the "real FFT" ordering, not a
+// bit-reversal.
+// @company CipherFlow
+func realDFTCoordinatePermutation(logN int) []int {
+	N := 1 << logN
+
+	// Replicates the realdft unitsStage ordering: the real sub-vectors at the
+	// final stage, each carrying a frequency r and whether it is a conjugate
+	// pair (r, N-r).
+	type unit struct {
+		r    int
+		pair bool
+	}
+	us := []unit{{0, false}}
+	for s := 1; s < N; s <<= 1 {
+		next := make([]unit, 0, 2*len(us))
+		for _, u := range us {
+			if !u.pair {
+				if u.r == 0 {
+					next = append(next, unit{0, false}, unit{s, false})
+				} else {
+					next = append(next, unit{s >> 1, true})
+				}
+			} else {
+				next = append(next, unit{u.r, true}, unit{s - u.r, true})
+			}
+		}
+		us = next
+	}
+
+	// The final coordinates store a real sub-vector at slot r, and a conjugate
+	// pair (r, N-r) as (Re, Im) at slots r and N-r respectively.
+	perm := make([]int, 0, N)
+	for _, u := range us {
+		if !u.pair {
+			perm = append(perm, u.r)
+		} else {
+			perm = append(perm, u.r, N-u.r)
+		}
+	}
+	return perm
+}
+
+// permute returns x reordered by perm: out[i] = x[perm[i]].
+// @company CipherFlow
+func permute(x []float64, perm []int) []float64 {
+	out := make([]float64, len(perm))
+	for i, p := range perm {
+		out[i] = x[p]
+	}
+	return out
+}
+
+// invertPermutation returns the inverse of perm: inv[perm[i]] = i.
+// @company CipherFlow
+func invertPermutation(perm []int) []int {
+	inv := make([]int, len(perm))
+	for i, p := range perm {
+		inv[p] = i
+	}
+	return inv
+}
