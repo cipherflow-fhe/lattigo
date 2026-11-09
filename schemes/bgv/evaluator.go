@@ -1371,9 +1371,10 @@ func (eval Evaluator) Rescale(op0, opOut *rlwe.Ciphertext) (err error) {
 	return eval.rescale(op0, opOut) // @company CipherFlow
 }
 
-// @company CipherFlow
 // RescaleScaleInvariant divides op0 by the last prime even when the evaluator is
 // configured for scale-invariant BFV-style tensoring.
+//
+// @company CipherFlow
 func (eval Evaluator) RescaleScaleInvariant(op0, opOut *rlwe.Ciphertext) (err error) {
 	return eval.rescale(op0, opOut)
 }
@@ -1454,8 +1455,9 @@ func (eval Evaluator) RotateRows(op0, opOut *rlwe.Ciphertext) (err error) {
 	return eval.Automorphism(op0, eval.parameters.GaloisElementForRowRotation(), opOut)
 }
 
-// @company CipherFlow
 // RotateHoistedNew applies a series of rotations on the same ciphertext and returns each different rotation in a map indexed by the rotation.
+//
+// @company CipherFlow
 func (eval Evaluator) RotateHoistedNew(ctIn *rlwe.Ciphertext, rotations []int) (opOut map[int]*rlwe.Ciphertext, err error) {
 	opOut = make(map[int]*rlwe.Ciphertext)
 	for _, i := range rotations {
@@ -1465,9 +1467,10 @@ func (eval Evaluator) RotateHoistedNew(ctIn *rlwe.Ciphertext, rotations []int) (
 	return opOut, eval.RotateHoisted(ctIn, rotations, opOut)
 }
 
-// @company CipherFlow
 // RotateHoisted takes an input Ciphertext and a list of rotations and populates a map of pre-allocated Ciphertexts,
 // where each element of the map is the input Ciphertext rotation by one element of the list.
+//
+// @company CipherFlow
 func (eval Evaluator) RotateHoisted(ctIn *rlwe.Ciphertext, rotations []int, opOut map[int]*rlwe.Ciphertext) (err error) {
 	levelQ := ctIn.Level()
 	levelP := eval.parameters.MaxLevelP()

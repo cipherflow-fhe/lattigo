@@ -152,6 +152,9 @@ func Complex128ToFixedPointCRT(r *ring.Ring, values []complex128, scale float64,
 	}
 }
 
+// Complex128ToFixedPointRingT encodes the real parts of the given complex values
+// into a fixed-point CRT representation in the first level of r.
+//
 // @company CipherFlow
 func Complex128ToFixedPointRingT(r *ring.Ring, values []complex128, scale float64, coeffs []uint64) {
 	coeffsCRT := [][]uint64{coeffs}

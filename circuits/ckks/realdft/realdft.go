@@ -1,4 +1,3 @@
-// @company CipherFlow
 // Package realdft implements a factorized real DFT/IDFT for the
 // conjugate-invariant CKKS ring.
 //
@@ -27,6 +26,8 @@
 // (slot j corresponds to the root ζ_{4N}^{5^j}) so that they can be
 // evaluated homomorphically with the generic lintrans machinery: a diagonal
 // with index k stores M[row][row+k].
+//
+// @company CipherFlow
 package realdft
 
 import (
