@@ -167,7 +167,7 @@ func (p Parameters) evaluationGaloisElements() []uint64 {
 // slot follows EvaluationKeys.WriteTo: six optional switching keys, RLK, GLKs.
 // The visitor borrows the key only for the duration of the call unless it is the
 // bulk collector above. Temporary secrets remain alive for all linked keys.
-func (p Parameters) genEvaluationKeysSequential(skN1 *rlwe.SecretKey, visit func(int, io.WriterTo) error) (skN2 *rlwe.SecretKey, err error) {
+func (p Parameters) genEvaluationKeysSequential(skN1 *rlwe.SecretKey, visit func(int, io.WriterTo) error, evkParams ...rlwe.EvaluationKeyParameters) (skN2 *rlwe.SecretKey, err error) {
 	paramsN2 := p.BootstrappingParameters
 	kgen := rlwe.NewKeyGenerator(paramsN2)
 	if p.ResidualParameters.N() != paramsN2.N() {
@@ -192,9 +192,9 @@ func (p Parameters) genEvaluationKeysSequential(skN1 *rlwe.SecretKey, visit func
 		var key *rlwe.EvaluationKey
 		if crossN && !ci {
 			if slot == 0 {
-				key = kgen.GenEvaluationKeyNew(skN1, skN2)
+				key = kgen.GenEvaluationKeyNew(skN1, skN2, evkParams...)
 			} else {
-				key = kgen.GenEvaluationKeyNew(skN2, skN1)
+				key = kgen.GenEvaluationKeyNew(skN2, skN1, evkParams...)
 			}
 		}
 		if err = switchKey(slot, key); err != nil {
@@ -203,7 +203,7 @@ func (p Parameters) genEvaluationKeysSequential(skN1 *rlwe.SecretKey, visit func
 	}
 	var realToCmplx, cmplxToReal *rlwe.EvaluationKey
 	if crossN && ci {
-		cmplxToReal, realToCmplx = kgen.GenEvaluationKeysForRingSwapNew(skN2, skN1)
+		cmplxToReal, realToCmplx = kgen.GenEvaluationKeysForRingSwapNew(skN2, skN1, evkParams...)
 	}
 	if err = switchKey(2, realToCmplx); err != nil {
 		return nil, err
@@ -229,18 +229,18 @@ func (p Parameters) genEvaluationKeysSequential(skN1 *rlwe.SecretKey, visit func
 		}
 		kgenSparse := rlwe.NewKeyGenerator(paramsSparse)
 		skSparse := kgenSparse.GenSecretKeyWithHammingWeightNew(p.EphemeralSecretWeight)
-		if err = switchKey(4, kgenSparse.GenEvaluationKeyNew(skN2, skSparse)); err != nil {
+		if err = switchKey(4, kgenSparse.GenEvaluationKeyNew(skN2, skSparse, evkParams...)); err != nil {
 			return nil, err
 		}
-		if err = switchKey(5, kgen.GenEvaluationKeyNew(skSparse, skN2)); err != nil {
+		if err = switchKey(5, kgen.GenEvaluationKeyNew(skSparse, skN2, evkParams...)); err != nil {
 			return nil, err
 		}
 	}
-	if err = visit(6, kgen.GenRelinearizationKeyNew(skN2)); err != nil {
+	if err = visit(6, kgen.GenRelinearizationKeyNew(skN2, evkParams...)); err != nil {
 		return nil, err
 	}
 	for _, galEl := range p.evaluationGaloisElements() {
-		if err = visit(7, kgen.GenGaloisKeyNew(galEl, skN2)); err != nil {
+		if err = visit(7, kgen.GenGaloisKeyNew(galEl, skN2, evkParams...)); err != nil {
 			return nil, err
 		}
 	}

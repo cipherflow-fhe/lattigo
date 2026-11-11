@@ -6,11 +6,11 @@ import (
 	"io"
 	"slices"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/cipherflow-fhe/lattigo/ring/ringqp"
 	"github.com/cipherflow-fhe/lattigo/utils/buffer"
 	"github.com/cipherflow-fhe/lattigo/utils/sampling"
 	"github.com/cipherflow-fhe/lattigo/utils/structs"
+	"github.com/google/go-cmp/cmp"
 )
 
 // SecretKey is a type for generic RLWE secret keys.
@@ -423,8 +423,8 @@ func (evk EvaluationKey) Expand(params ParameterProvider, buffer *GadgetCipherte
 
 // BinarySize returns the serialized size of the object in bytes.
 func (evk EvaluationKey) BinarySize() (size int) {
-	if evk.Seed != nil {
-		return evk.GadgetCiphertext.BinarySize() + len(*evk.Seed)
+	if evk.IsCompressed() {
+		return evk.GadgetCiphertext.BinarySize() + 32
 	}
 	return evk.GadgetCiphertext.BinarySize()
 }

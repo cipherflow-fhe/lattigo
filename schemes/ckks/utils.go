@@ -215,38 +215,39 @@ func SingleFloat64ToFixedPointCRT(r *ring.Ring, i int, value float64, scale floa
 
 	value *= scale
 
-	moduli := r.ModuliChain()[:r.Level()+1]
+	subRings := r.SubRings[:r.Level()+1]
 
 	if value >= 1.8446744073709552e+19 {
 		xFlo = big.NewFloat(value)
 		xFlo.Add(xFlo, big.NewFloat(0.5))
 		xInt = new(big.Int)
 		xFlo.Int(xInt)
-		for j := range moduli {
-			tmp.Mod(xInt, bignum.NewInt(moduli[j]))
+		for j, subRing := range subRings {
+			qi := subRing.Modulus
+			tmp.Mod(xInt, bignum.NewInt(qi))
 			if isNegative {
-				coeffs[j][i] = moduli[j] - tmp.Uint64()
+				coeffs[j][i] = qi - tmp.Uint64()
 			} else {
 				coeffs[j][i] = tmp.Uint64()
 			}
 		}
 
 	} else {
-		brc := r.BRedConstants()
-
 		c = uint64(value + 0.5)
 		if isNegative {
-			for j, qi := range moduli {
+			for j, subRing := range subRings {
+				qi := subRing.Modulus
 				if c > qi {
-					coeffs[j][i] = qi - ring.BRedAdd(c, qi, brc[j])
+					coeffs[j][i] = qi - ring.BRedAdd(c, qi, subRing.BRedConstant)
 				} else {
 					coeffs[j][i] = qi - c
 				}
 			}
 		} else {
-			for j, qi := range moduli {
+			for j, subRing := range subRings {
+				qi := subRing.Modulus
 				if c > 0x1fffffffffffffff {
-					coeffs[j][i] = ring.BRedAdd(c, qi, brc[j])
+					coeffs[j][i] = ring.BRedAdd(c, qi, subRing.BRedConstant)
 				} else {
 					coeffs[j][i] = c
 				}

@@ -102,6 +102,11 @@ func CreateCkksDefaultParameter(logN int, ringType int, parameterHandle *C.uint6
 
 //export CreateCkksCustomParameter
 func CreateCkksCustomParameter(logN int, logDefaultScale int, q *C.uint64_t, qLen int, p *C.uint64_t, pLen int, ringType int, parameterHandle *C.uint64_t) (status C.ErrorStatus) {
+	return CreateCkksCustomParameterWithSecretWeight(logN, logDefaultScale, q, qLen, p, pLen, ringType, 0, parameterHandle)
+}
+
+//export CreateCkksCustomParameterWithSecretWeight
+func CreateCkksCustomParameterWithSecretWeight(logN int, logDefaultScale int, q *C.uint64_t, qLen int, p *C.uint64_t, pLen int, ringType int, secretHammingWeight int, parameterHandle *C.uint64_t) (status C.ErrorStatus) {
 	status = okStatus()
 	defer recoverStatus(&status)
 
@@ -109,24 +114,28 @@ func CreateCkksCustomParameter(logN int, logDefaultScale int, q *C.uint64_t, qLe
 	if err != nil {
 		return errorStatus(err)
 	}
-
-	qSlice := unsafe.Slice((*uint64)(q), qLen)
-	pSlice := unsafe.Slice((*uint64)(p), pLen)
-
-	literal := ckks.ParametersLiteral{
-		LogN:            logN,
-		Q:               append([]uint64(nil), qSlice...),
-		P:               append([]uint64(nil), pSlice...),
-		LogDefaultScale: logDefaultScale,
-		RingType:        ringTypeValue,
-	}
-
-	params, err := ckks.NewParametersFromLiteral(literal)
+	params, err := newCustomCkksParameters(logN, logDefaultScale,
+		unsafe.Slice((*uint64)(q), qLen), unsafe.Slice((*uint64)(p), pLen), ringTypeValue, secretHammingWeight)
 	if err != nil {
 		return errorStatus(err)
 	}
 	*parameterHandle = C.uint64_t(insertObject(&params))
 	return status
+}
+
+// A zero weight retains Lattigo's default secret distribution.
+func newCustomCkksParameters(logN, logDefaultScale int, q, p []uint64, ringType ring.Type, secretHammingWeight int) (ckks.Parameters, error) {
+	if logN < 1 || logN > rlwe.MaxLogN || secretHammingWeight < 0 || secretHammingWeight > 1<<logN {
+		return ckks.Parameters{}, fmt.Errorf("invalid CKKS degree or secret Hamming weight")
+	}
+	literal := ckks.ParametersLiteral{
+		LogN: logN, Q: append([]uint64(nil), q...), P: append([]uint64(nil), p...),
+		LogDefaultScale: logDefaultScale, RingType: ringType,
+	}
+	if secretHammingWeight != 0 {
+		literal.Xs = ring.Ternary{H: secretHammingWeight}
+	}
+	return ckks.NewParametersFromLiteral(literal)
 }
 
 //export CopyCkksParameter

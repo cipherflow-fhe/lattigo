@@ -107,7 +107,7 @@ func prepare(params ckks.Parameters, plan KeyPlan) (*Context, error) {
 	return c, nil
 }
 
-// WriteEval writes the existing SDK CKKSCTX1 encoding, generating one key at a
+// WriteEval writes CKKSCTX1 with versioned packed key blobs, generating one key at a
 // time. dst must be empty and unpublished; any failure leaves it incomplete.
 func (c *Context) WriteEval(dst Sink) (uint64, error) {
 	w := &streamWriter{dst: dst}
@@ -160,34 +160,26 @@ func (c *Context) writeContext(w *streamWriter, eval bool) error {
 		return err
 	}
 	if eval && c.btp != nil {
-		return w.blob(func(dst io.Writer) error { _, e := c.btp.GenEvaluationKeysTo(c.SecretKey, dst); return e })
+		return w.blob(func(dst io.Writer) error { return c.btp.GenPackedEvaluationKeysTo(c.SecretKey, dst) })
 	}
 	return nil
 }
 
 func (c *Context) writeResidualKeys(dst io.Writer) error {
-	kgen := rlwe.NewKeyGenerator(c.Parameters)
-	if _, err := dst.Write([]byte{1}); err != nil { // RLK present
+	params := c.Parameters.Parameters
+	kgen := rlwe.NewKeyGenerator(params)
+	options := rlwe.EvaluationKeyParameters{Compressed: true}
+	if err := rlwe.WritePackedParameters(dst, rlwe.PackedKeySetMagic, params); err != nil {
 		return err
 	}
-	if err := writeObject(dst, kgen.GenRelinearizationKeyNew(c.SecretKey)); err != nil {
+	if err := rlwe.WritePackedEvaluationKey(dst, params, &kgen.GenRelinearizationKeyNew(c.SecretKey, options).EvaluationKey); err != nil {
 		return err
 	}
-	if _, err := dst.Write([]byte{1}); err != nil { // Galois map present
-		return err
-	}
-	var count [4]byte
-	binary.LittleEndian.PutUint32(count[:], uint32(len(c.galEls)))
-	if _, err := dst.Write(count[:]); err != nil {
+	if err := binary.Write(dst, binary.LittleEndian, uint32(len(c.galEls))); err != nil {
 		return err
 	}
 	for _, galEl := range c.galEls {
-		var key [8]byte
-		binary.LittleEndian.PutUint64(key[:], galEl)
-		if _, err := dst.Write(key[:]); err != nil {
-			return err
-		}
-		if err := writeObject(dst, kgen.GenGaloisKeyNew(galEl, c.SecretKey)); err != nil {
+		if err := rlwe.WritePackedGaloisKey(dst, params, kgen.GenGaloisKeyNew(galEl, c.SecretKey, options)); err != nil {
 			return err
 		}
 	}

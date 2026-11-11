@@ -25,8 +25,8 @@ type KeyCapability struct {
 }
 
 // DescribeKeyPlan uses the same parameter/rotation derivation as WriteEval.
-// The SDK currently generates uncompressed keys with the v6 default base two
-// decomposition; no compatibility mapping or second key state is introduced.
+// Capabilities describe the expanded runtime keys. Seed compression and bit
+// packing affect persistence only; the native bridge expands them before use.
 func DescribeKeyPlan(params ckks.Parameters, plan KeyPlan) ([]KeyCapability, error) {
 	c, err := prepare(params, plan)
 	if err != nil {

@@ -39,7 +39,7 @@ func exportFile(t *testing.T, write func(Sink) (uint64, error)) []byte {
 }
 
 // The envelope is consumed field-by-field just like CkksContext::deserialize;
-// key payloads are read by the unchanged native v6 MemEvaluationKeySet reader.
+// key payloads are unpacked and expanded by the native bridge before use.
 func readEval(t *testing.T, data []byte, params ckks.Parameters, pk *rlwe.PublicKey) *rlwe.MemEvaluationKeySet {
 	t.Helper()
 	r := bytes.NewReader(data)
@@ -67,10 +67,8 @@ func readEval(t *testing.T, data []byte, params ckks.Parameters, pk *rlwe.Public
 	require.Equal(t, byte(1), flag)
 	keysData, err := readBlob(r)
 	require.NoError(t, err)
-	keys := new(rlwe.MemEvaluationKeySet)
-	n, err := keys.ReadFrom(bytes.NewReader(keysData))
+	keys, err := rlwe.UnmarshalPackedEvaluationKeySet(keysData)
 	require.NoError(t, err)
-	require.Equal(t, len(keysData), int(n))
 	flag, err = r.ReadByte()
 	require.NoError(t, err)
 	require.Zero(t, flag)

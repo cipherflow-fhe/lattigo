@@ -16,6 +16,7 @@ typedef struct ErrorStatus {
 import "C"
 
 import (
+	"bytes"
 	"fmt"
 	"unsafe"
 
@@ -702,7 +703,17 @@ func DeserializeEvaluationKeySet(rawData *byte, length C.uint64_t, evaluationKey
 	}
 
 	evaluationKeySet := new(rlwe.MemEvaluationKeySet)
-	if err := evaluationKeySet.UnmarshalBinary(data); err != nil {
+	var err error
+	if bytes.HasPrefix(data, []byte(rlwe.PackedKeySetMagic)) {
+		evaluationKeySet, err = rlwe.UnmarshalPackedEvaluationKeySet(data)
+	} else {
+		var n int64
+		n, err = evaluationKeySet.ReadFrom(bytes.NewReader(data))
+		if err == nil && n != int64(len(data)) {
+			err = fmt.Errorf("evaluation key data has trailing bytes")
+		}
+	}
+	if err != nil {
 		return errorStatus(err)
 	}
 	*evaluationKeySetHandle = C.uint64_t(insertObject(evaluationKeySet))

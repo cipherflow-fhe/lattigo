@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/cipherflow-fhe/lattigo/circuits/ckks/bootstrapping"
 	"github.com/cipherflow-fhe/lattigo/core/rlwe"
 	"github.com/cipherflow-fhe/lattigo/schemes/ckks"
 	"github.com/stretchr/testify/require"
@@ -55,6 +56,57 @@ func TestGeneratedKeyCapabilities(t *testing.T) {
 	skipBlob() // residual keys are covered by TestStreamingContextRoundTrip
 	require.Equal(t, byte(1), flag())
 	bootLength := u64()
+	prefix, err := r.Peek(8)
+	require.NoError(t, err)
+	if string(prefix) == bootstrapping.PackedKeysMagic {
+		packed := &boundedPackedReader{LimitedReader: io.LimitedReader{R: r, N: int64(bootLength)}}
+		bootParams, err := rlwe.ReadPackedParameters(packed, bootstrapping.PackedKeysMagic)
+		require.NoError(t, err)
+		capabilities, err := DescribeKeyPlan(params, plan)
+		require.NoError(t, err)
+		available := map[string]KeyCapability{}
+		for _, key := range capabilities {
+			if key.Role == "bootstrap" {
+				available[key.Kind+"/"+strconv.FormatUint(key.GaloisElement, 10)] = key
+			}
+		}
+		check := func(kind string, element uint64, key *rlwe.EvaluationKey) {
+			id := kind + "/" + strconv.FormatUint(element, 10)
+			info, exists := available[id]
+			require.True(t, exists, id)
+			delete(available, id)
+			require.Equal(t, info.LevelQ, key.LevelQ(), id)
+			require.Equal(t, info.LevelP, key.LevelP(), id)
+			require.Equal(t, info.DecompositionRNS, key.BaseRNSDecompositionVectorSize(), id)
+			require.Equal(t, info.BaseTwoDecomposition, key.BaseTwoDecomposition, id)
+			require.Equal(t, 1, key.Degree(), id)
+		}
+		for _, kind := range []string{"evk_n1_to_n2", "evk_n2_to_n1", "evk_ci_to_std", "evk_std_to_ci", "evk_dense_to_sparse", "evk_sparse_to_dense"} {
+			flag, err := packed.ReadByte()
+			require.NoError(t, err)
+			require.LessOrEqual(t, flag, byte(1))
+			if flag == 1 {
+				key, err := rlwe.ReadPackedEvaluationKey(packed, bootParams)
+				require.NoError(t, err)
+				check(kind, 0, key)
+			}
+		}
+		key, err := rlwe.ReadPackedEvaluationKey(packed, bootParams)
+		require.NoError(t, err)
+		check("rlk", 0, key)
+		var count uint32
+		require.NoError(t, binary.Read(packed, binary.LittleEndian, &count))
+		for range count {
+			key, err := rlwe.ReadPackedGaloisKey(packed, bootParams)
+			require.NoError(t, err)
+			check("glk", key.GaloisElement, &key.EvaluationKey)
+		}
+		require.Empty(t, available)
+		require.Zero(t, packed.Len())
+		_, err = r.ReadByte()
+		require.ErrorIs(t, err, io.EOF)
+		return
+	}
 	before, _ := f.Seek(0, io.SeekCurrent)
 	before -= int64(r.Buffered())
 	capabilities, err := DescribeKeyPlan(params, plan)
@@ -110,4 +162,14 @@ func TestGeneratedKeyCapabilities(t *testing.T) {
 	_, err = r.ReadByte()
 	require.ErrorIs(t, err, io.EOF)
 	t.Logf("bootKeys=%d largestSerializedKeyBytes=%d", bootCount, largest)
+}
+
+// Preserve streaming acceptance: never retain an entire multi-GiB key blob.
+type boundedPackedReader struct{ io.LimitedReader }
+
+func (r *boundedPackedReader) Len() int { return int(r.N) }
+func (r *boundedPackedReader) ReadByte() (byte, error) {
+	var value [1]byte
+	_, err := io.ReadFull(r, value[:])
+	return value[0], err
 }

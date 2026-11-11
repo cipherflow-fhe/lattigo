@@ -15,6 +15,7 @@ typedef struct ErrorStatus {
 import "C"
 
 import (
+	"bytes"
 	"fmt"
 	"unsafe"
 
@@ -204,7 +205,17 @@ func DeserializeCkksBootstrappingEvaluationKeys(rawData *byte, length C.uint64_t
 	}
 
 	keys := new(bootstrapping.EvaluationKeys)
-	if err := keys.UnmarshalBinary(data); err != nil {
+	var err error
+	if bytes.HasPrefix(data, []byte(bootstrapping.PackedKeysMagic)) {
+		keys, err = bootstrapping.UnmarshalPackedEvaluationKeys(data)
+	} else {
+		var n int64
+		n, err = keys.ReadFrom(bytes.NewReader(data))
+		if err == nil && n != int64(len(data)) {
+			err = fmt.Errorf("evaluation key data has trailing bytes")
+		}
+	}
+	if err != nil {
 		return errorStatus(err)
 	}
 

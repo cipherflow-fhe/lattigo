@@ -55,15 +55,22 @@ func TestStreamingEvaluationKeys(t *testing.T) {
 				require.NoError(t, err)
 				// Regenerate a complete bundle twice under the same residual SK,
 				// and consume both with the unchanged v6 reader and evaluator.
-				for round := 0; round < 2; round++ {
+				for round := 0; round < 3; round++ {
 					var output bytes.Buffer
-					n, err := p.GenEvaluationKeysTo(sk, &output)
-					require.NoError(t, err)
-					require.Equal(t, int64(output.Len()), n)
 					var keys EvaluationKeys
-					read, err := keys.ReadFrom(bytes.NewReader(output.Bytes()))
-					require.NoError(t, err)
-					require.Equal(t, n, read)
+					if round == 2 {
+						require.NoError(t, p.GenPackedEvaluationKeysTo(sk, &output))
+						decoded, err := UnmarshalPackedEvaluationKeys(output.Bytes())
+						require.NoError(t, err)
+						keys = *decoded
+					} else {
+						n, err := p.GenEvaluationKeysTo(sk, &output)
+						require.NoError(t, err)
+						require.Equal(t, int64(output.Len()), n)
+						read, err := keys.ReadFrom(bytes.NewReader(output.Bytes()))
+						require.NoError(t, err)
+						require.Equal(t, n, read)
+					}
 					require.Equal(t, weight != 0, keys.EvkDenseToSparse != nil)
 					require.Equal(t, weight != 0, keys.EvkSparseToDense != nil)
 					require.Equal(t, tc.typ == ring.ConjugateInvariant, keys.EvkRealToCmplx != nil)
@@ -71,9 +78,11 @@ func TestStreamingEvaluationKeys(t *testing.T) {
 					require.Equal(t, tc.typ == ring.Standard && tc.logN != 10, keys.EvkN1ToN2 != nil)
 					require.Equal(t, tc.typ == ring.Standard && tc.logN != 10, keys.EvkN2ToN1 != nil)
 					require.ElementsMatch(t, p.evaluationGaloisElements(), keys.GetGaloisKeysList())
-					canonical, err := keys.MarshalBinary()
-					require.NoError(t, err)
-					require.Equal(t, canonical, output.Bytes())
+					if round != 2 {
+						canonical, err := keys.MarshalBinary()
+						require.NoError(t, err)
+						require.Equal(t, canonical, output.Bytes())
+					}
 					for _, key := range keys.GaloisKeys {
 						require.Equal(t, p.BootstrappingParameters.RingQ().NthRoot(), key.NthRoot)
 					}
@@ -110,6 +119,7 @@ func TestSequentialGenerationStopsOnConsumerError(t *testing.T) {
 	require.Equal(t, 1, calls)
 	_, err = p.GenEvaluationKeysTo(sk, rejectWriter{failure})
 	require.ErrorIs(t, err, failure)
+	require.ErrorIs(t, p.GenPackedEvaluationKeysTo(sk, rejectWriter{failure}), failure)
 }
 
 type rejectWriter struct{ err error }
