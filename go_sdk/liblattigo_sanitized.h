@@ -266,7 +266,6 @@ extern ErrorStatus BfvRotateColumns(GoUint64 evaluatorHandle, GoUint64 op0Cipher
 extern ErrorStatus BfvRotateRows(GoUint64 evaluatorHandle, GoUint64 op0CiphertextHandle, uint64_t* opOutCiphertextHandle);
 extern ErrorStatus CreateCkksDefaultParameter(GoInt logN, GoInt ringType, uint64_t* parameterHandle);
 extern ErrorStatus CreateCkksCustomParameter(GoInt logN, GoInt logDefaultScale, uint64_t* q, GoInt qLen, uint64_t* p, GoInt pLen, GoInt ringType, uint64_t* parameterHandle);
-extern ErrorStatus CreateCkksCustomParameterWithSecretWeight(GoInt logN, GoInt logDefaultScale, uint64_t* q, GoInt qLen, uint64_t* p, GoInt pLen, GoInt ringType, GoInt secretHammingWeight, uint64_t* parameterHandle);
 extern ErrorStatus CopyCkksParameter(GoUint64 parameterHandle, uint64_t* targetHandle);
 extern ErrorStatus SerializeCkksParameter(GoUint64 parameterHandle, GoUint8** rawData, uint64_t* length, uint64_t* dataHandle);
 extern ErrorStatus DeserializeCkksParameter(GoUint8* rawData, uint64_t length, uint64_t* parameterHandle);
