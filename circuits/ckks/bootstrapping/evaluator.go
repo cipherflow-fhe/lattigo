@@ -595,9 +595,22 @@ func (eval Evaluator) bootstrap(ctIn *rlwe.Ciphertext) (ctOut *rlwe.Ciphertext, 
 // It then rescales the ciphertext down to q if necessary and also returns the rescaling error from this process
 func (eval Evaluator) ScaleDown(ctIn *rlwe.Ciphertext) (*rlwe.Ciphertext, *rlwe.Scale, error) {
 
+	// @company CipherFlow: the bootstrapping circuit expects the input at level 0.
+	if ctIn.Level() != 0 {
+		return nil, nil, fmt.Errorf("cannot ScaleDown: the input ciphertext must be at level 0, but is at level %d", ctIn.Level())
+	}
+
 	params := &eval.BootstrappingParameters
 
 	r := params.RingQ()
+
+	// @company CipherFlow: Q[0] is normalised to its closest power of two. The
+	// deviation qDiff = Q[0]/2^round(log2 Q[0]) is already folded into the
+	// modular reduction parameters (Sqrt2Pi and the CoeffsToSlots scaling), so
+	// normalising by Q[0] itself would apply it twice (only visible when
+	// qDiff != 1).
+	q0f, _ := new(big.Float).SetInt(r.ModulusAtLevel[0]).Float64() // @company CipherFlow
+	q0Pow2 := new(big.Float).SetPrec(256).SetFloat64(math.Exp2(math.Round(math.Log2(q0f)))) // @company CipherFlow
 
 	// Removes unecessary primes
 	for ctIn.Level() != 0 && checkMessageRatio(ctIn, eval.Mod1Parameters.MessageRatio(), r) {
@@ -605,7 +618,7 @@ func (eval Evaluator) ScaleDown(ctIn *rlwe.Ciphertext) (*rlwe.Ciphertext, *rlwe.
 	}
 
 	// Current Message Ratio
-	currentMessageRatio := rlwe.NewScale(r.ModulusAtLevel[ctIn.Level()])
+	currentMessageRatio := rlwe.NewScale(q0Pow2) // @company CipherFlow
 	currentMessageRatio = currentMessageRatio.Div(ctIn.Scale)
 
 	// Desired Message Ratio
@@ -627,7 +640,7 @@ func (eval Evaluator) ScaleDown(ctIn *rlwe.Ciphertext) (*rlwe.Ciphertext, *rlwe.
 	ctIn.Scale = ctIn.Scale.Mul(rlwe.NewScale(scaleUpBigint))
 
 	// errScale = CtIn.Scale/(Q[0]/MessageRatio)
-	targetScale := new(big.Float).SetPrec(256).SetInt(r.ModulusAtLevel[0])
+	targetScale := new(big.Float).SetPrec(256).Set(q0Pow2) // @company CipherFlow
 	targetScale.Quo(targetScale, new(big.Float).SetFloat64(eval.Mod1Parameters.MessageRatio()))
 
 	if ctIn.Level() != 0 {
