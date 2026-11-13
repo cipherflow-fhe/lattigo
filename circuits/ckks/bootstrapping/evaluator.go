@@ -599,13 +599,28 @@ func (eval Evaluator) ScaleDown(ctIn *rlwe.Ciphertext) (*rlwe.Ciphertext, *rlwe.
 
 	r := params.RingQ()
 
+	// @company CipherFlow: at level 0, Q[0] is normalised to its closest power
+	// of two. The deviation qDiff = Q[0]/2^round(log2 Q[0]) is already folded
+	// into the modular reduction parameters (Sqrt2Pi and the CoeffsToSlots
+	// scaling), so normalising by Q[0] itself would apply it twice (only visible
+	// when qDiff != 1). Bootstrapping iterations (META-BTS) re-enter ScaleDown
+	// with a ciphertext at a level > 0: the original per-level normalisation is
+	// kept there.
+	q0f, _ := new(big.Float).SetInt(r.ModulusAtLevel[0]).Float64()
+	q0Pow2 := new(big.Int).SetUint64(uint64(math.Exp2(math.Round(math.Log2(q0f))))) // @company CipherFlow
+
+	qLevel := r.ModulusAtLevel[ctIn.Level()] // @company CipherFlow
+	if ctIn.Level() == 0 {                   // @company CipherFlow
+		qLevel = q0Pow2
+	}
+
 	// Removes unecessary primes
 	for ctIn.Level() != 0 && checkMessageRatio(ctIn, eval.Mod1Parameters.MessageRatio(), r) {
 		ctIn.Resize(ctIn.Degree(), ctIn.Level()-1)
 	}
 
 	// Current Message Ratio
-	currentMessageRatio := rlwe.NewScale(r.ModulusAtLevel[ctIn.Level()])
+	currentMessageRatio := rlwe.NewScale(qLevel) // @company CipherFlow
 	currentMessageRatio = currentMessageRatio.Div(ctIn.Scale)
 
 	// Desired Message Ratio
@@ -627,7 +642,11 @@ func (eval Evaluator) ScaleDown(ctIn *rlwe.Ciphertext) (*rlwe.Ciphertext, *rlwe.
 	ctIn.Scale = ctIn.Scale.Mul(rlwe.NewScale(scaleUpBigint))
 
 	// errScale = CtIn.Scale/(Q[0]/MessageRatio)
-	targetScale := new(big.Float).SetPrec(256).SetInt(r.ModulusAtLevel[0])
+	targetQ := r.ModulusAtLevel[0] // @company CipherFlow
+	if ctIn.Level() == 0 {         // @company CipherFlow
+		targetQ = q0Pow2
+	}
+	targetScale := new(big.Float).SetPrec(256).SetInt(targetQ) // @company CipherFlow
 	targetScale.Quo(targetScale, new(big.Float).SetFloat64(eval.Mod1Parameters.MessageRatio()))
 
 	if ctIn.Level() != 0 {
