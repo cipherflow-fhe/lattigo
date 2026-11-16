@@ -271,10 +271,28 @@ func (eval Evaluator) BootstrapMany(cts []rlwe.Ciphertext) ([]rlwe.Ciphertext, e
 			}
 		}
 
-	case eval.nativeCI && eval.ResidualParameters.N() == eval.BootstrappingParameters.N(): // @company CipherFlow
+	case eval.nativeCI: // @company CipherFlow
 
 		// @company CipherFlow: the native CI path bootstraps each ciphertext
-		// independently, with no domain switch or repacking.
+		// independently, with no domain switch and no repacking. The standard
+		// packing aligns the odd ciphertext with an X-shift, which does not map
+		// onto the real-DFT slot subspace (only the even ciphertext of a packed
+		// pair survives), so a circuit ring larger than the residual ring is
+		// handled by a per-ciphertext ring-degree switch instead.
+		if len(cts) == 0 {
+			return cts, nil
+		}
+
+		n1 := eval.ResidualParameters.N()
+		n2 := eval.BootstrappingParameters.N()
+		logSlots := cts[0].LogSlots()
+		if n1 != n2 {
+			for i := range cts {
+				cts[i] = *eval.switchRingDegreeN1ToN2New(&cts[i])
+				cts[i].LogDimensions = eval.BootstrappingParameters.LogMaxDimensions()
+			}
+		}
+
 		for i := range cts {
 			var ct *rlwe.Ciphertext
 			if ct, err = eval.Evaluate(&cts[i]); err != nil {
@@ -283,10 +301,16 @@ func (eval Evaluator) BootstrapMany(cts []rlwe.Ciphertext) ([]rlwe.Ciphertext, e
 			cts[i] = *ct
 		}
 
+		if n1 != n2 {
+			for i := range cts {
+				cts[i] = *eval.switchRingDegreeN2ToN1New(&cts[i])
+				cts[i].LogDimensions.Cols = logSlots
+			}
+		}
+
 	default:
 
-		// Standard ring, or native CI with a larger bootstrapping ring degree:
-		// pack, switch ring degree, bootstrap and unpack.
+		// Standard ring: pack, switch ring degree, bootstrap and unpack.
 		ctsPacked, ctxt1, ctxt2, err := eval.PackAndSwitchN1ToN2(cts)
 		if err != nil {
 			return nil, fmt.Errorf("cannot BootstrapMany: %w", err)
