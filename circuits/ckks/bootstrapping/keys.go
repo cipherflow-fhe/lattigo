@@ -81,7 +81,7 @@ func (p Parameters) GenEvaluationKeysWithCompressedOption(skN1 *rlwe.SecretKey, 
 func (p Parameters) genEvaluationKeys(skN1 *rlwe.SecretKey, compressed bool) (btpkeys *EvaluationKeys, skN2 *rlwe.SecretKey, err error) { // @company CipherFlow
 
 	var evkParams []rlwe.EvaluationKeyParameters // @company CipherFlow
-	if compressed { // @company CipherFlow
+	if compressed {                              // @company CipherFlow
 		evkParams = []rlwe.EvaluationKeyParameters{{Compressed: true}}
 	}
 
