@@ -311,7 +311,7 @@ extern ErrorStatus CkksBootstrapMany(GoUint64 evaluatorHandle, uint64_t* op0Ciph
 extern ErrorStatus ImportCiphertext(GoUint64 parameterHandle, GoUint64 destHandle, Metadata* sourceMetadata, Metadata* targetMetadata, CCiphertext* cCiphertext);
 extern void ExportPlaintext(GoUint64 parameterHandle, GoUint64 plaintextHandle, Metadata* metadata, CPlaintext* plaintext);
 extern void ExportCiphertext(GoUint64 parameterHandle, GoUint64 ciphertextHandle, Metadata* metadata, CCiphertext* ciphertext);
-extern void ExportEvaluationKey(GoUint64 parameterHandle, GoUint64 evaluationKeyHandle, GoInt levelP, Metadata* metadata, CEvaluationKey* evaluationKey);
+extern ErrorStatus ExportEvaluationKey(GoUint64 parameterHandle, GoUint64 evaluationKeyHandle, GoInt levelP, Metadata* metadata, CEvaluationKey* evaluationKey);
 extern void BfvPolyNttInplace(GoUint64 parameter_handle, uint64_t* data, GoInt level_q, GoInt level_p);
 extern void BfvPolyInvNttInplace(GoUint64 parameter_handle, uint64_t* data, GoInt level_q, GoInt level_p);
 extern void BfvPolyMulByPow2Inplace(GoUint64 parameter_handle, uint64_t* data, GoInt level_q, GoInt level_p, GoInt pow2);

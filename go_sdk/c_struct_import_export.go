@@ -311,27 +311,44 @@ func ExportCiphertext(parameterHandle uint64, ciphertextHandle uint64, metadata 
 }
 
 //export ExportEvaluationKey
-func ExportEvaluationKey(parameterHandle uint64, evaluationKeyHandle uint64, levelP int, metadata *C.Metadata, evaluationKey *C.CEvaluationKey) {
-	params := getObjectAs[rlwe.ParameterProvider](parameterHandle).GetRLWEParameters()
+func ExportEvaluationKey(parameterHandle uint64, evaluationKeyHandle uint64, levelP int, metadata *C.Metadata, evaluationKey *C.CEvaluationKey) (status C.ErrorStatus) {
+	status = okStatus()
+	defer recoverStatus(&status)
+
+	provider := getObjectAs[rlwe.ParameterProvider](parameterHandle)
+	params := provider.GetRLWEParameters()
 	value := cgo.Handle(evaluationKeyHandle).Value()
 	switch key := value.(type) {
 	case *rlwe.EvaluationKey:
+		expanded, err := expandEvaluationKeyIfNeeded(provider, key)
+		if err != nil {
+			return errorStatus(err)
+		}
 		resolvedLevelP := levelP
 		if resolvedLevelP == -1 {
-			resolvedLevelP = key.LevelP()
+			resolvedLevelP = expanded.LevelP()
 		}
-		exportEvaluationKey(params, key, evaluationKey, resolvedLevelP, metadata)
+		exportEvaluationKey(params, expanded, evaluationKey, resolvedLevelP, metadata)
 	case *rlwe.RelinearizationKey:
+		expanded, err := expandEvaluationKeyIfNeeded(provider, &key.EvaluationKey)
+		if err != nil {
+			return errorStatus(err)
+		}
 		resolvedLevelP := levelP
 		if resolvedLevelP == -1 {
-			resolvedLevelP = key.LevelP()
+			resolvedLevelP = expanded.LevelP()
 		}
-		exportEvaluationKey(params, &key.EvaluationKey, evaluationKey, resolvedLevelP, metadata)
+		exportEvaluationKey(params, expanded, evaluationKey, resolvedLevelP, metadata)
 	case *rlwe.GaloisKey:
+		expanded, err := expandEvaluationKeyIfNeeded(provider, &key.EvaluationKey)
+		if err != nil {
+			return errorStatus(err)
+		}
 		resolvedLevelP := levelP
 		if resolvedLevelP == -1 {
-			resolvedLevelP = key.LevelP()
+			resolvedLevelP = expanded.LevelP()
 		}
-		exportEvaluationKey(params, &key.EvaluationKey, evaluationKey, resolvedLevelP, metadata)
+		exportEvaluationKey(params, expanded, evaluationKey, resolvedLevelP, metadata)
 	}
+	return status
 }

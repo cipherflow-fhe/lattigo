@@ -569,6 +569,21 @@ func ExpandGaloisKey(galoisKeyHandle uint64, parameterHandle uint64, expandedHan
 	return status
 }
 
+// expandEvaluationKeyIfNeeded returns the key itself when it is not compressed,
+// otherwise an expanded deep copy.
+func expandEvaluationKeyIfNeeded(params rlwe.ParameterProvider,
+	key *rlwe.EvaluationKey) (*rlwe.EvaluationKey, error) {
+
+	if key == nil || !key.IsCompressed() {
+		return key, nil
+	}
+	expanded := key.CopyNew()
+	if err := expanded.Expand(params, nil); err != nil {
+		return nil, err
+	}
+	return expanded, nil
+}
+
 // expandEvaluationKeySetIfNeeded returns the input set when no key is compressed,
 // otherwise an expanded deep copy.
 func expandEvaluationKeySetIfNeeded(params rlwe.ParameterProvider,
@@ -593,19 +608,24 @@ func expandEvaluationKeySetIfNeeded(params rlwe.ParameterProvider,
 
 	var relinearizationKey *rlwe.RelinearizationKey
 	if evaluationKeySet.RelinearizationKey != nil {
-		relinearizationKey = evaluationKeySet.RelinearizationKey.CopyNew()
-		if err := relinearizationKey.EvaluationKey.Expand(params, nil); err != nil {
+		expanded, err := expandEvaluationKeyIfNeeded(params, &evaluationKeySet.RelinearizationKey.EvaluationKey)
+		if err != nil {
 			return nil, err
 		}
+		relinearizationKey = &rlwe.RelinearizationKey{EvaluationKey: *expanded}
 	}
 
 	galoisKeys := make([]*rlwe.GaloisKey, 0, len(evaluationKeySet.GaloisKeys))
 	for _, galoisKey := range evaluationKeySet.GaloisKeys {
-		galoisKeyCopy := galoisKey.CopyNew()
-		if err := galoisKeyCopy.EvaluationKey.Expand(params, nil); err != nil {
+		expanded, err := expandEvaluationKeyIfNeeded(params, &galoisKey.EvaluationKey)
+		if err != nil {
 			return nil, err
 		}
-		galoisKeys = append(galoisKeys, galoisKeyCopy)
+		galoisKeys = append(galoisKeys, &rlwe.GaloisKey{
+			GaloisElement: galoisKey.GaloisElement,
+			NthRoot:       galoisKey.NthRoot,
+			EvaluationKey: *expanded,
+		})
 	}
 
 	return rlwe.NewMemEvaluationKeySet(relinearizationKey, galoisKeys...), nil
