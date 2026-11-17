@@ -111,13 +111,13 @@ func CreateCkksBtpParameterFromResidualParameter(residualParameterHandle uint64,
 }
 
 //export GenCkksBootstrappingEvaluationKeys
-func GenCkksBootstrappingEvaluationKeys(parameterHandle uint64, secretKeyHandle uint64, bootstrappingEvaluationKeysHandle *C.uint64_t, evkN1ToN2Handle *C.uint64_t, evkN2ToN1Handle *C.uint64_t, evkDenseToSparseHandle *C.uint64_t, evkSparseToDenseHandle *C.uint64_t, evaluationKeySetHandle *C.uint64_t) (status C.ErrorStatus) {
+func GenCkksBootstrappingEvaluationKeys(parameterHandle uint64, secretKeyHandle uint64, compressed int, bootstrappingEvaluationKeysHandle *C.uint64_t, evkN1ToN2Handle *C.uint64_t, evkN2ToN1Handle *C.uint64_t, evkDenseToSparseHandle *C.uint64_t, evkSparseToDenseHandle *C.uint64_t, evaluationKeySetHandle *C.uint64_t) (status C.ErrorStatus) {
 	status = okStatus()
 	defer recoverStatus(&status)
 
 	params := getObject[bootstrapping.Parameters](parameterHandle)
 	secretKey := getObject[rlwe.SecretKey](secretKeyHandle)
-	keys, _, err := params.GenEvaluationKeys(secretKey)
+	keys, _, err := params.GenEvaluationKeysWithCompressedOption(secretKey, compressed != 0)
 	if err != nil {
 		return errorStatus(err)
 	}
@@ -294,6 +294,103 @@ func SetCkksBootstrappingEvaluationKeySparseToDense(bootstrappingEvaluationKeysH
 	return status
 }
 
+// expandBootstrappingEvaluationKeysIfNeeded returns the input keys when none is
+// compressed, otherwise an expanded deep copy.
+func expandBootstrappingEvaluationKeysIfNeeded(params bootstrapping.Parameters,
+	keys *bootstrapping.EvaluationKeys) (*bootstrapping.EvaluationKeys, error) {
+
+	if keys == nil {
+		return nil, nil
+	}
+
+	paramsN2 := params.BootstrappingParameters
+	needsExpand := false
+	for _, key := range []*rlwe.EvaluationKey{
+		keys.EvkN1ToN2, keys.EvkN2ToN1, keys.EvkRealToCmplx, keys.EvkCmplxToReal, keys.EvkDenseToSparse,
+		keys.EvkSparseToDense,
+	} {
+		if key != nil && key.IsCompressed() {
+			needsExpand = true
+			break
+		}
+	}
+	if !needsExpand && keys.MemEvaluationKeySet != nil {
+		needsExpand = keys.MemEvaluationKeySet.RelinearizationKey != nil &&
+			keys.MemEvaluationKeySet.RelinearizationKey.IsCompressed()
+		if !needsExpand {
+			for _, galoisKey := range keys.MemEvaluationKeySet.GaloisKeys {
+				if galoisKey.IsCompressed() {
+					needsExpand = true
+					break
+				}
+			}
+		}
+	}
+	if !needsExpand {
+		return keys, nil
+	}
+
+	expand := func(key *rlwe.EvaluationKey, keyParams rlwe.ParameterProvider) (*rlwe.EvaluationKey, error) {
+		if key == nil {
+			return nil, nil
+		}
+		keyCopy := key.CopyNew()
+		if keyCopy.IsCompressed() {
+			if err := keyCopy.Expand(keyParams, nil); err != nil {
+				return nil, err
+			}
+		}
+		return keyCopy, nil
+	}
+
+	out := *keys
+	var err error
+	if out.EvkN1ToN2, err = expand(keys.EvkN1ToN2, paramsN2); err != nil {
+		return nil, err
+	}
+	if out.EvkN2ToN1, err = expand(keys.EvkN2ToN1, paramsN2); err != nil {
+		return nil, err
+	}
+	if out.EvkRealToCmplx, err = expand(keys.EvkRealToCmplx, paramsN2); err != nil {
+		return nil, err
+	}
+	if out.EvkCmplxToReal, err = expand(keys.EvkCmplxToReal, paramsN2); err != nil {
+		return nil, err
+	}
+
+	// The dense-to-sparse key lives in a parameter set whose Q is the first
+	// prime of the bootstrapping modulus chain.
+	var sparseParams rlwe.ParameterProvider = paramsN2
+	if paramsN2.QCount() > 1 {
+		paramsSparse, err := rlwe.NewParametersFromLiteral(rlwe.ParametersLiteral{
+			LogN:     paramsN2.LogN(),
+			Q:        paramsN2.Q()[:1],
+			P:        paramsN2.P(),
+			RingType: paramsN2.RingType(),
+		})
+		if err != nil {
+			return nil, err
+		}
+		sparseParams = paramsSparse
+	}
+	if out.EvkDenseToSparse, err = expand(keys.EvkDenseToSparse, sparseParams); err != nil {
+		return nil, err
+	}
+	if out.EvkSparseToDense, err = expand(keys.EvkSparseToDense, paramsN2); err != nil {
+		return nil, err
+	}
+
+	if keys.MemEvaluationKeySet != nil {
+		evaluationKeySet, err := expandEvaluationKeySetIfNeeded(paramsN2, keys.MemEvaluationKeySet)
+		if err != nil {
+			return nil, err
+		}
+		out.MemEvaluationKeySet = evaluationKeySet
+	}
+
+	return &out, nil
+}
+
 //export CreateCkksBtpEvaluator
 func CreateCkksBtpEvaluator(parameterHandle uint64, bootstrappingEvaluationKeysHandle uint64, evaluatorHandle *C.uint64_t) (status C.ErrorStatus) {
 	status = okStatus()
@@ -301,6 +398,10 @@ func CreateCkksBtpEvaluator(parameterHandle uint64, bootstrappingEvaluationKeysH
 
 	params := getObject[bootstrapping.Parameters](parameterHandle)
 	keys := getObject[bootstrapping.EvaluationKeys](bootstrappingEvaluationKeysHandle)
+	keys, err := expandBootstrappingEvaluationKeysIfNeeded(*params, keys)
+	if err != nil {
+		return errorStatus(err)
+	}
 	bootstrapper, err := bootstrapping.NewEvaluator(*params, keys)
 	if err != nil {
 		return errorStatus(err)

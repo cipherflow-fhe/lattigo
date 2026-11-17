@@ -188,8 +188,14 @@ extern ErrorStatus DeserializePublicKey(GoUint8* rawData, uint64_t length, uint6
 extern ErrorStatus CreateEncryptorFromSecretKey(GoUint64 parameterHandle, GoUint64 secretKeyHandle, uint64_t* encryptorHandle);
 extern ErrorStatus CreateEncryptorFromPublicKey(GoUint64 parameterHandle, GoUint64 publicKeyHandle, uint64_t* encryptorHandle);
 extern ErrorStatus CreateDecryptor(GoUint64 parameterHandle, GoUint64 secretKeyHandle, uint64_t* decryptorHandle);
-extern ErrorStatus GenRelinearizationKey(GoUint64 keyGeneratorHandle, GoUint64 secretKeyHandle, GoInt level, uint64_t* relinearizationKeyHandle);
-extern ErrorStatus GenGaloisKeysForRotations(GoUint64 keyGeneratorHandle, GoUint64 secretKeyHandle, int32_t* rotations, GoInt rotationCount, GoUint8 includeConjugation, GoInt level, uint64_t* galoisElements, uint64_t* galoisKeyHandles);
+extern ErrorStatus GenRelinearizationKey(GoUint64 keyGeneratorHandle, GoUint64 secretKeyHandle, GoInt level, GoInt compressed, uint64_t* relinearizationKeyHandle);
+extern ErrorStatus GenGaloisKeysForRotations(GoUint64 keyGeneratorHandle, GoUint64 secretKeyHandle, int32_t* rotations, GoInt rotationCount, GoUint8 includeConjugation, GoInt level, GoInt compressed, uint64_t* galoisElements, uint64_t* galoisKeyHandles);
+extern ErrorStatus GetEvaluationKeyCompressed(GoUint64 evaluationKeyHandle, int* compressed);
+extern ErrorStatus ExpandEvaluationKey(GoUint64 evaluationKeyHandle, GoUint64 parameterHandle, uint64_t* expandedHandle);
+extern ErrorStatus GetRelinearizationKeyCompressed(GoUint64 relinearizationKeyHandle, int* compressed);
+extern ErrorStatus ExpandRelinearizationKey(GoUint64 relinearizationKeyHandle, GoUint64 parameterHandle, uint64_t* expandedHandle);
+extern ErrorStatus GetGaloisKeyCompressed(GoUint64 galoisKeyHandle, int* compressed);
+extern ErrorStatus ExpandGaloisKey(GoUint64 galoisKeyHandle, GoUint64 parameterHandle, uint64_t* expandedHandle);
 extern ErrorStatus CopyEvaluationKey(GoUint64 evaluationKeyHandle, uint64_t* targetHandle);
 extern ErrorStatus SerializeEvaluationKey(GoUint64 evaluationKeyHandle, GoUint8** rawData, uint64_t* length, uint64_t* dataHandle);
 extern ErrorStatus DeserializeEvaluationKey(GoUint8* rawData, uint64_t length, uint64_t* evaluationKeyHandle);
@@ -289,7 +295,7 @@ extern GoUint64 CkksPolyEvalStepFunction(GoUint64 evaluatorHandle, GoUint64 ciph
 extern ErrorStatus GetCkksResidualParameterFromBtpParameter(GoUint64 parameterHandle, uint64_t* residualParameterHandle);
 extern ErrorStatus GetCkksBootstrappingParameterFromBtpParameter(GoUint64 parameterHandle, uint64_t* bootstrappingParameterHandle);
 extern ErrorStatus CreateCkksBtpParameterFromResidualParameter(GoUint64 residualParameterHandle, uint64_t* parameterHandle);
-extern ErrorStatus GenCkksBootstrappingEvaluationKeys(GoUint64 parameterHandle, GoUint64 secretKeyHandle, uint64_t* bootstrappingEvaluationKeysHandle, uint64_t* evkN1ToN2Handle, uint64_t* evkN2ToN1Handle, uint64_t* evkDenseToSparseHandle, uint64_t* evkSparseToDenseHandle, uint64_t* evaluationKeySetHandle);
+extern ErrorStatus GenCkksBootstrappingEvaluationKeys(GoUint64 parameterHandle, GoUint64 secretKeyHandle, GoInt compressed, uint64_t* bootstrappingEvaluationKeysHandle, uint64_t* evkN1ToN2Handle, uint64_t* evkN2ToN1Handle, uint64_t* evkDenseToSparseHandle, uint64_t* evkSparseToDenseHandle, uint64_t* evaluationKeySetHandle);
 extern ErrorStatus CreateCkksBootstrappingEvaluationKeys(GoUint64 evkN1ToN2Handle, GoUint64 evkN2ToN1Handle, GoUint64 evkDenseToSparseHandle, GoUint64 evkSparseToDenseHandle, GoUint64 evaluationKeySetHandle, uint64_t* bootstrappingEvaluationKeysHandle);
 extern ErrorStatus GetCkksBootstrappingEvaluationKeys(GoUint64 bootstrappingEvaluationKeysHandle, uint64_t* evkN1ToN2Handle, uint64_t* evkN2ToN1Handle, uint64_t* evkDenseToSparseHandle, uint64_t* evkSparseToDenseHandle, uint64_t* evaluationKeySetHandle);
 extern ErrorStatus SerializeCkksBootstrappingEvaluationKeys(GoUint64 bootstrappingEvaluationKeysHandle, GoUint8** rawData, uint64_t* length, uint64_t* dataHandle);

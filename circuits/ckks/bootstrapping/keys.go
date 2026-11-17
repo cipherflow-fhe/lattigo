@@ -67,6 +67,23 @@ type EvaluationKeys struct {
 //   - !WARNING! The bootstrapping parameters use their own and independent cryptographic parameters (i.e. float.Parameters)
 //     and it is the user's responsibility to ensure that these parameters meet the target security and tweak them if necessary.
 func (p Parameters) GenEvaluationKeys(skN1 *rlwe.SecretKey) (btpkeys *EvaluationKeys, skN2 *rlwe.SecretKey, err error) {
+	return p.GenEvaluationKeysWithCompressedOption(skN1, false) // @company CipherFlow
+}
+
+// GenEvaluationKeysWithCompressedOption generates the bootstrapping evaluation
+// keys with an optional seed-compressed format. Compressed keys must be expanded
+// before an evaluator can use them.
+// @company CipherFlow
+func (p Parameters) GenEvaluationKeysWithCompressedOption(skN1 *rlwe.SecretKey, compressed bool) (btpkeys *EvaluationKeys, skN2 *rlwe.SecretKey, err error) {
+	return p.genEvaluationKeys(skN1, compressed)
+}
+
+func (p Parameters) genEvaluationKeys(skN1 *rlwe.SecretKey, compressed bool) (btpkeys *EvaluationKeys, skN2 *rlwe.SecretKey, err error) { // @company CipherFlow
+
+	var evkParams []rlwe.EvaluationKeyParameters // @company CipherFlow
+	if compressed { // @company CipherFlow
+		evkParams = []rlwe.EvaluationKeyParameters{{Compressed: true}}
+	}
 
 	var EvkN1ToN2, EvkN2ToN1 *rlwe.EvaluationKey
 	var EvkRealToCmplx *rlwe.EvaluationKey
@@ -81,10 +98,10 @@ func (p Parameters) GenEvaluationKeys(skN1 *rlwe.SecretKey) (btpkeys *Evaluation
 		skN2 = kgen.GenSecretKeyNew()
 
 		if p.ResidualParameters.RingType() == ring.ConjugateInvariant && !p.NativeCI { // @company CipherFlow
-			EvkCmplxToReal, EvkRealToCmplx = kgen.GenEvaluationKeysForRingSwapNew(skN2, skN1)
+			EvkCmplxToReal, EvkRealToCmplx = kgen.GenEvaluationKeysForRingSwapNew(skN2, skN1, evkParams...) // @company CipherFlow
 		} else {
-			EvkN1ToN2 = kgen.GenEvaluationKeyNew(skN1, skN2)
-			EvkN2ToN1 = kgen.GenEvaluationKeyNew(skN2, skN1)
+			EvkN1ToN2 = kgen.GenEvaluationKeyNew(skN1, skN2, evkParams...) // @company CipherFlow
+			EvkN2ToN1 = kgen.GenEvaluationKeyNew(skN2, skN1, evkParams...) // @company CipherFlow
 		}
 
 	} else {
@@ -103,16 +120,16 @@ func (p Parameters) GenEvaluationKeys(skN1 *rlwe.SecretKey) (btpkeys *Evaluation
 		rlwe.ExtendBasisSmallNormAndCenterNTTMontgomery(ringQ, ringP, skN1.Value.Q, buff, skN2.Value.P)
 	}
 
-	EvkDenseToSparse, EvkSparseToDense := p.genEncapsulationEvaluationKeysNew(skN2)
+	EvkDenseToSparse, EvkSparseToDense := p.genEncapsulationEvaluationKeysNew(skN2, evkParams) // @company CipherFlow
 
-	rlk := kgen.GenRelinearizationKeyNew(skN2)
+	rlk := kgen.GenRelinearizationKeyNew(skN2, evkParams...) // @company CipherFlow
 
 	galEls := p.GaloisElements(paramsN2)
 	// @company CipherFlow: the conjugation key does not exist in the CI ring.
 	if paramsN2.RingType() != ring.ConjugateInvariant {
 		galEls = append(galEls, paramsN2.GaloisElementForComplexConjugation())
 	}
-	gks := kgen.GenGaloisKeysNew(galEls, skN2)
+	gks := kgen.GenGaloisKeysNew(galEls, skN2, evkParams...) // @company CipherFlow
 
 	return &EvaluationKeys{
 		EvkN1ToN2:           EvkN1ToN2,
@@ -126,7 +143,8 @@ func (p Parameters) GenEvaluationKeys(skN1 *rlwe.SecretKey) (btpkeys *Evaluation
 }
 
 // GenEncapsulationEvaluationKeysNew generates the low level encapsulation EvaluationKeys for the bootstrapping.
-func (p Parameters) genEncapsulationEvaluationKeysNew(skDense *rlwe.SecretKey) (EvkDenseToSparse, EvkSparseToDense *rlwe.EvaluationKey) {
+func (p Parameters) genEncapsulationEvaluationKeysNew(skDense *rlwe.SecretKey,
+	evkParams []rlwe.EvaluationKeyParameters) (EvkDenseToSparse, EvkSparseToDense *rlwe.EvaluationKey) { // @company CipherFlow
 
 	params := p.BootstrappingParameters
 
@@ -145,8 +163,8 @@ func (p Parameters) genEncapsulationEvaluationKeysNew(skDense *rlwe.SecretKey) (
 	kgenDense := rlwe.NewKeyGenerator(params)
 	skSparse := kgenSparse.GenSecretKeyWithHammingWeightNew(p.EphemeralSecretWeight)
 
-	EvkDenseToSparse = kgenSparse.GenEvaluationKeyNew(skDense, skSparse)
-	EvkSparseToDense = kgenDense.GenEvaluationKeyNew(skSparse, skDense)
+	EvkDenseToSparse = kgenSparse.GenEvaluationKeyNew(skDense, skSparse, evkParams...) // @company CipherFlow
+	EvkSparseToDense = kgenDense.GenEvaluationKeyNew(skSparse, skDense, evkParams...)  // @company CipherFlow
 	return
 }
 

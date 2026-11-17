@@ -532,7 +532,12 @@ func (evk *EvaluationKey) UnmarshalBinary(p []byte) (err error) {
 
 // CopyNew creates a deep copy of the target [EvaluationKey] and returns it.
 func (evk EvaluationKey) CopyNew() *EvaluationKey {
-	return &EvaluationKey{GadgetCiphertext: *evk.GadgetCiphertext.CopyNew()}
+	evkCopy := &EvaluationKey{GadgetCiphertext: *evk.GadgetCiphertext.CopyNew()}
+	if evk.Seed != nil { // @company CipherFlow: keep the seed of a compressed key
+		seed := *evk.Seed
+		evkCopy.Seed = &seed
+	}
+	return evkCopy
 }
 
 // RelinearizationKey is type of [EvaluationKey] used for ciphertext multiplication compactness.

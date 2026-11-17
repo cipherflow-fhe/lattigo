@@ -271,6 +271,10 @@ func CreateCkksEvaluator(parameterHandle uint64, evaluationKeySetHandle uint64, 
 
 	params := getObject[ckks.Parameters](parameterHandle)
 	evaluationKeySet := getObject[rlwe.MemEvaluationKeySet](evaluationKeySetHandle)
+	evaluationKeySet, err := expandEvaluationKeySetIfNeeded(params, evaluationKeySet)
+	if err != nil {
+		return errorStatus(err)
+	}
 	evaluator := ckks.NewEvaluator(*params, evaluationKeySet)
 	*evaluatorHandle = C.uint64_t(insertObject(evaluator))
 	return status
@@ -283,6 +287,10 @@ func SetCkksEvaluatorEvaluationKeySet(evaluatorHandle uint64, evaluationKeySetHa
 
 	evaluator := getObject[ckks.Evaluator](evaluatorHandle)
 	evaluationKeySet := getObject[rlwe.MemEvaluationKeySet](evaluationKeySetHandle)
+	evaluationKeySet, err := expandEvaluationKeySetIfNeeded(evaluator.GetRLWEParameters(), evaluationKeySet)
+	if err != nil {
+		return errorStatus(err)
+	}
 	*evaluator = *evaluator.WithKey(evaluationKeySet)
 	return status
 }

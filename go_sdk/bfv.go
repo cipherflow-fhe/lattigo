@@ -210,6 +210,10 @@ func CreateBfvEvaluator(parameterHandle uint64, evaluationKeySetHandle uint64, e
 	params := getObject[bgv.Parameters](parameterHandle)
 
 	evaluationKeySet := getObject[rlwe.MemEvaluationKeySet](evaluationKeySetHandle)
+	evaluationKeySet, err := expandEvaluationKeySetIfNeeded(params, evaluationKeySet)
+	if err != nil {
+		return errorStatus(err)
+	}
 	evaluator := bgv.NewEvaluator(*params, evaluationKeySet, true)
 	*evaluatorHandle = C.uint64_t(insertObject(evaluator))
 	return status
@@ -222,6 +226,10 @@ func SetBfvEvaluatorEvaluationKeySet(evaluatorHandle uint64, evaluationKeySetHan
 
 	evaluator := getObject[bgv.Evaluator](evaluatorHandle)
 	evaluationKeySet := getObject[rlwe.MemEvaluationKeySet](evaluationKeySetHandle)
+	evaluationKeySet, err := expandEvaluationKeySetIfNeeded(evaluator.GetRLWEParameters(), evaluationKeySet)
+	if err != nil {
+		return errorStatus(err)
+	}
 	*evaluator = *evaluator.WithKey(evaluationKeySet)
 	return status
 }

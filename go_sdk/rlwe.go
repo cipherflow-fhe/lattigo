@@ -408,23 +408,27 @@ func CreateDecryptor(parameterHandle uint64, secretKeyHandle uint64, decryptorHa
 }
 
 //export GenRelinearizationKey
-func GenRelinearizationKey(keyGeneratorHandle uint64, secretKeyHandle uint64, level int, relinearizationKeyHandle *C.uint64_t) (status C.ErrorStatus) {
+func GenRelinearizationKey(keyGeneratorHandle uint64, secretKeyHandle uint64, level int, compressed int, relinearizationKeyHandle *C.uint64_t) (status C.ErrorStatus) {
 	status = okStatus()
 	defer recoverStatus(&status)
 
 	keyGenerator := getObject[rlwe.KeyGenerator](keyGeneratorHandle)
 	secretKey := getObject[rlwe.SecretKey](secretKeyHandle)
 	var evaluationKeyParameters []rlwe.EvaluationKeyParameters
-	if level >= 0 {
-		levelQ := level
-		evaluationKeyParameters = []rlwe.EvaluationKeyParameters{{LevelQ: &levelQ}}
+	if level >= 0 || compressed != 0 {
+		evkParams := rlwe.EvaluationKeyParameters{Compressed: compressed != 0}
+		if level >= 0 {
+			levelQ := level
+			evkParams.LevelQ = &levelQ
+		}
+		evaluationKeyParameters = []rlwe.EvaluationKeyParameters{evkParams}
 	}
 	relinearizationKey := keyGenerator.GenRelinearizationKeyNew(secretKey, evaluationKeyParameters...)
 	*relinearizationKeyHandle = C.uint64_t(insertObject(relinearizationKey))
 	return status
 }
 
-func genGaloisKeys(keyGeneratorHandle uint64, secretKeyHandle uint64, galoisElementList []uint64, level int, galoisKeyHandles *C.uint64_t) (status C.ErrorStatus) {
+func genGaloisKeys(keyGeneratorHandle uint64, secretKeyHandle uint64, galoisElementList []uint64, level int, compressed int, galoisKeyHandles *C.uint64_t) (status C.ErrorStatus) {
 	status = okStatus()
 	defer recoverStatus(&status)
 
@@ -435,9 +439,13 @@ func genGaloisKeys(keyGeneratorHandle uint64, secretKeyHandle uint64, galoisElem
 	keyGenerator := getObject[rlwe.KeyGenerator](keyGeneratorHandle)
 	secretKey := getObject[rlwe.SecretKey](secretKeyHandle)
 	var evaluationKeyParameters []rlwe.EvaluationKeyParameters
-	if level >= 0 {
-		levelQ := level
-		evaluationKeyParameters = []rlwe.EvaluationKeyParameters{{LevelQ: &levelQ}}
+	if level >= 0 || compressed != 0 {
+		evkParams := rlwe.EvaluationKeyParameters{Compressed: compressed != 0}
+		if level >= 0 {
+			levelQ := level
+			evkParams.LevelQ = &levelQ
+		}
+		evaluationKeyParameters = []rlwe.EvaluationKeyParameters{evkParams}
 	}
 	handles := unsafe.Slice((*uint64)(galoisKeyHandles), len(galoisElementList))
 	for i, galoisElement := range galoisElementList {
@@ -448,7 +456,7 @@ func genGaloisKeys(keyGeneratorHandle uint64, secretKeyHandle uint64, galoisElem
 }
 
 //export GenGaloisKeysForRotations
-func GenGaloisKeysForRotations(keyGeneratorHandle uint64, secretKeyHandle uint64, rotations *C.int32_t, rotationCount int, includeConjugation bool, level int, galoisElements *C.uint64_t, galoisKeyHandles *C.uint64_t) (status C.ErrorStatus) {
+func GenGaloisKeysForRotations(keyGeneratorHandle uint64, secretKeyHandle uint64, rotations *C.int32_t, rotationCount int, includeConjugation bool, level int, compressed int, galoisElements *C.uint64_t, galoisKeyHandles *C.uint64_t) (status C.ErrorStatus) {
 	status = okStatus()
 	defer recoverStatus(&status)
 
@@ -474,7 +482,133 @@ func GenGaloisKeysForRotations(keyGeneratorHandle uint64, secretKeyHandle uint64
 	if len(galoisElementList) != 0 {
 		copy(unsafe.Slice((*uint64)(galoisElements), len(galoisElementList)), galoisElementList)
 	}
-	return genGaloisKeys(keyGeneratorHandle, secretKeyHandle, galoisElementList, level, galoisKeyHandles)
+	return genGaloisKeys(keyGeneratorHandle, secretKeyHandle, galoisElementList, level, compressed, galoisKeyHandles)
+}
+
+//export GetEvaluationKeyCompressed
+func GetEvaluationKeyCompressed(evaluationKeyHandle uint64, compressed *C.int) (status C.ErrorStatus) {
+	status = okStatus()
+	defer recoverStatus(&status)
+
+	*compressed = 0
+	if getObject[rlwe.EvaluationKey](evaluationKeyHandle).IsCompressed() {
+		*compressed = 1
+	}
+	return status
+}
+
+//export ExpandEvaluationKey
+func ExpandEvaluationKey(evaluationKeyHandle uint64, parameterHandle uint64, expandedHandle *C.uint64_t) (status C.ErrorStatus) {
+	status = okStatus()
+	defer recoverStatus(&status)
+
+	params := getObjectAs[rlwe.ParameterProvider](parameterHandle)
+	expanded := getObject[rlwe.EvaluationKey](evaluationKeyHandle).CopyNew()
+	if expanded.IsCompressed() {
+		if err := expanded.Expand(params, nil); err != nil {
+			return errorStatus(err)
+		}
+	}
+	*expandedHandle = C.uint64_t(insertObject(expanded))
+	return status
+}
+
+//export GetRelinearizationKeyCompressed
+func GetRelinearizationKeyCompressed(relinearizationKeyHandle uint64, compressed *C.int) (status C.ErrorStatus) {
+	status = okStatus()
+	defer recoverStatus(&status)
+
+	*compressed = 0
+	if getObject[rlwe.RelinearizationKey](relinearizationKeyHandle).IsCompressed() {
+		*compressed = 1
+	}
+	return status
+}
+
+//export ExpandRelinearizationKey
+func ExpandRelinearizationKey(relinearizationKeyHandle uint64, parameterHandle uint64, expandedHandle *C.uint64_t) (status C.ErrorStatus) {
+	status = okStatus()
+	defer recoverStatus(&status)
+
+	params := getObjectAs[rlwe.ParameterProvider](parameterHandle)
+	expanded := getObject[rlwe.RelinearizationKey](relinearizationKeyHandle).CopyNew()
+	if expanded.IsCompressed() {
+		if err := expanded.EvaluationKey.Expand(params, nil); err != nil {
+			return errorStatus(err)
+		}
+	}
+	*expandedHandle = C.uint64_t(insertObject(expanded))
+	return status
+}
+
+//export GetGaloisKeyCompressed
+func GetGaloisKeyCompressed(galoisKeyHandle uint64, compressed *C.int) (status C.ErrorStatus) {
+	status = okStatus()
+	defer recoverStatus(&status)
+
+	*compressed = 0
+	if getObject[rlwe.GaloisKey](galoisKeyHandle).IsCompressed() {
+		*compressed = 1
+	}
+	return status
+}
+
+//export ExpandGaloisKey
+func ExpandGaloisKey(galoisKeyHandle uint64, parameterHandle uint64, expandedHandle *C.uint64_t) (status C.ErrorStatus) {
+	status = okStatus()
+	defer recoverStatus(&status)
+
+	params := getObjectAs[rlwe.ParameterProvider](parameterHandle)
+	expanded := getObject[rlwe.GaloisKey](galoisKeyHandle).CopyNew()
+	if expanded.IsCompressed() {
+		if err := expanded.EvaluationKey.Expand(params, nil); err != nil {
+			return errorStatus(err)
+		}
+	}
+	*expandedHandle = C.uint64_t(insertObject(expanded))
+	return status
+}
+
+// expandEvaluationKeySetIfNeeded returns the input set when no key is compressed,
+// otherwise an expanded deep copy.
+func expandEvaluationKeySetIfNeeded(params rlwe.ParameterProvider,
+	evaluationKeySet *rlwe.MemEvaluationKeySet) (*rlwe.MemEvaluationKeySet, error) {
+
+	if evaluationKeySet == nil {
+		return nil, nil
+	}
+
+	needsExpand := evaluationKeySet.RelinearizationKey != nil && evaluationKeySet.RelinearizationKey.IsCompressed()
+	if !needsExpand {
+		for _, galoisKey := range evaluationKeySet.GaloisKeys {
+			if galoisKey.IsCompressed() {
+				needsExpand = true
+				break
+			}
+		}
+	}
+	if !needsExpand {
+		return evaluationKeySet, nil
+	}
+
+	var relinearizationKey *rlwe.RelinearizationKey
+	if evaluationKeySet.RelinearizationKey != nil {
+		relinearizationKey = evaluationKeySet.RelinearizationKey.CopyNew()
+		if err := relinearizationKey.EvaluationKey.Expand(params, nil); err != nil {
+			return nil, err
+		}
+	}
+
+	galoisKeys := make([]*rlwe.GaloisKey, 0, len(evaluationKeySet.GaloisKeys))
+	for _, galoisKey := range evaluationKeySet.GaloisKeys {
+		galoisKeyCopy := galoisKey.CopyNew()
+		if err := galoisKeyCopy.EvaluationKey.Expand(params, nil); err != nil {
+			return nil, err
+		}
+		galoisKeys = append(galoisKeys, galoisKeyCopy)
+	}
+
+	return rlwe.NewMemEvaluationKeySet(relinearizationKey, galoisKeys...), nil
 }
 
 //export CopyEvaluationKey
